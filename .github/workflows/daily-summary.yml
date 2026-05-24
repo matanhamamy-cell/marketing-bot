@@ -1,0 +1,32 @@
+name: Daily Summary
+
+on:
+  schedule:
+    # כל יום ב-20:00 שעון ישראל (קיץ = UTC+3) → 17:00 UTC
+    - cron: '0 17 * * *'
+  workflow_dispatch:
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run Daily Summary
+        env:
+          MONDAY_API_TOKEN:            ${{ secrets.MONDAY_API_TOKEN }}
+          MONDAY_BOARD_ID:             ${{ secrets.MONDAY_BOARD_ID }}
+          MONDAY_TRANSACTIONS_BOARD_ID: ${{ secrets.MONDAY_TRANSACTIONS_BOARD_ID }}
+          MONDAY_SOURCE_COL:           ${{ secrets.MONDAY_SOURCE_COL }}
+          MONDAY_DATE_COL:             ${{ secrets.MONDAY_DATE_COL }}
+          TG_TOKEN:                    ${{ secrets.TG_TOKEN }}
+          TG_CHAT_ID:                  ${{ secrets.TG_CHAT_ID }}
+        run: python scripts/daily_summary_cloud.py
