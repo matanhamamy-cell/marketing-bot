@@ -132,13 +132,15 @@ def build_message(tx, leads):
     d = f"{today_str[8:10]}/{today_str[5:7]}"
 
     # פתיחה לפי ביצועים
-    if tx["today_count"] >= 3:
-        opening = f"וואלה אחי מתן 🔥 יום חזק היום — נראה את המספרים"
-    else:
-        opening = f"אהלן אח יקר 👋 יאללה נראה איפה אנחנו היום"
-
     lines = []
-    lines.append(opening)
+    if tx["today_count"] >= 3:
+        lines.append("וואלה אחי מתן 🔥")
+        lines.append("יום חזק היום — נראה את המספרים")
+    else:
+        lines.append("אהלן אח יקר 👋")
+        lines.append("יאללה נראה איפה אנחנו היום")
+    lines.append("")
+    lines.append("")
     lines.append(f"📅 *סיכום יומי — {d}*")
     lines.append("")
 
