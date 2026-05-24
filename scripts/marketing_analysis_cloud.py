@@ -192,7 +192,6 @@ def analyze(metrics):
 
     # פתיחה
     lines.append("אהלן אח שלי 👋 יאללה נראה מה קרה השבוע בפרסום")
-    lines.append("")
 
     # כותרת
     d_start = f"{start_date[8:10]}/{start_date[5:7]}"

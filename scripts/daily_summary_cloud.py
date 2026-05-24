@@ -134,14 +134,11 @@ def build_message(tx, leads):
     # פתיחה לפי ביצועים
     if tx["today_count"] >= 3:
         opening = f"וואלה אחי מתן 🔥 יום חזק היום — נראה את המספרים"
-    elif tx["today_count"] == 0:
-        opening = f"אהלן מתן בוס 👋 יאללה נראה איפה אנחנו היום"
     else:
-        opening = f"אהלן מתן בוס 👋 יאללה נראה איפה אנחנו היום"
+        opening = f"אהלן אח יקר 👋 יאללה נראה איפה אנחנו היום"
 
     lines = []
     lines.append(opening)
-    lines.append("")
     lines.append(f"📅 *סיכום יומי — {d}*")
     lines.append("")
 
