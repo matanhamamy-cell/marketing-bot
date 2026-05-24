@@ -182,21 +182,11 @@ def build_message(curr, prev):
         icon = "✅" if better else "❌"
         return f"{sign}{d:.1f}% {icon}"
 
-    # בניית טבלה
-    rows = [
-        ("ערך",            prev_label,                    curr_label,                    "שינוי"),
-        ("─" * 14,         "─" * 10,                      "─" * 10,                      "─" * 10),
-        ("💰 מחזור",       f(prev["revenue"]),             f(curr["revenue"]),             diff(curr["revenue"],  prev["revenue"])),
-        ("📣 תקציב",       f(prev["spend"]),               f(curr["spend"]),               diff(curr["spend"],    prev["spend"])),
-        ("🤝 עסקאות",      f(prev["tx_count"], True),      f(curr["tx_count"], True),      diff(curr["tx_count"], prev["tx_count"])),
-        ("📥 עלות/ליד",   f(prev_cpl),                    f(curr_cpl),                    diff(curr_cpl,         prev_cpl,  lower_is_better=True)),
-        ("🎯 עלות/ייעוץ", f(prev_cpc),                    f(curr_cpc),                    diff(curr_cpc,         prev_cpc,  lower_is_better=True)),
-        ("💸 עלות/עסקה",  f(prev_cpt),                    f(curr_cpt),                    diff(curr_cpt,         prev_cpt,  lower_is_better=True)),
-    ]
-
-    col_w = [max(len(r[i]) for r in rows) + 1 for i in range(4)]
-    table_lines = [" | ".join(r[i].ljust(col_w[i]) for i in range(4)) for r in rows]
-    table = "\n".join(table_lines)
+    def line(emoji, label, p_num, c_num, lower_is_better=False, is_int=False):
+        p_str = str(round(p_num)) if is_int else f(p_num)
+        c_str = str(round(c_num)) if is_int else f(c_num)
+        d     = diff(c_num, p_num, lower_is_better)
+        return f"{emoji} {label}: {p_str} ← {c_str}   {d}"
 
     # תובנה
     rev_change = curr["revenue"] - prev["revenue"]
@@ -213,8 +203,14 @@ def build_message(curr, prev):
     msg = (
         f"אהלן אח יקר 👋\n"
         f"יאללה נראה איך היה {curr_label}\n\n\n"
-        f"<b>📊 סיכום חודשי — {curr_label} {curr_year}</b>\n\n"
-        f"<pre>{table}</pre>\n\n"
+        f"<b>📊 סיכום חודשי — {curr_label} {curr_year}</b>\n"
+        f"<i>{prev_label} ← {curr_label}</i>\n\n"
+        f"{line('💰', 'מחזור',       prev['revenue'],  curr['revenue'])}\n"
+        f"{line('📣', 'תקציב',       prev['spend'],    curr['spend'])}\n"
+        f"{line('🤝', 'עסקאות',      prev['tx_count'], curr['tx_count'], is_int=True)}\n"
+        f"{line('📥', 'עלות/ליד',   prev_cpl,         curr_cpl,         lower_is_better=True)}\n"
+        f"{line('🎯', 'עלות/ייעוץ', prev_cpc,         curr_cpc,         lower_is_better=True)}\n"
+        f"{line('💸', 'עלות/עסקה',  prev_cpt,         curr_cpt,         lower_is_better=True)}\n\n"
         f"💡 {insight}\n\n"
         f"יאללה קדימה, חודש טוב 💪"
     )
