@@ -163,18 +163,6 @@ def fmt_ils(n):
     return f"₪{round(n):,}"
 
 def build_message(curr, prev):
-    lines = []
-
-    # פתיחה
-    lines.append("אהלן אח יקר 👋")
-    lines.append(f"יאללה נראה איך היה {curr_label}")
-    lines.append("")
-    lines.append("")
-
-    lines.append(f"📊 *סיכום חודשי — {curr_label} {curr_year}*")
-    lines.append(f"_{prev_label} מול {curr_label}_")
-    lines.append("")
-
     prev_cpl = prev["spend"] / prev["gifts"]    if prev["gifts"]    > 0 else 0
     curr_cpl = curr["spend"] / curr["gifts"]    if curr["gifts"]    > 0 else 0
     prev_cpc = prev["spend"] / prev["consults"] if prev["consults"] > 0 else 0
@@ -182,47 +170,61 @@ def build_message(curr, prev):
     prev_cpt = prev["spend"] / prev["tx_count"] if prev["tx_count"] > 0 else 0
     curr_cpt = curr["spend"] / curr["tx_count"] if curr["tx_count"] > 0 else 0
 
-    def row(emoji, label, p_num, c_num, lower_is_better=False, is_int=False):
-        fmt = str if is_int else fmt_ils
-        p_str = fmt(round(p_num)) if p_num else "—"
-        c_str = fmt(round(c_num)) if c_num else "—"
-        p     = pct(c_num, p_num)
-        icon  = change_icon(c_num, p_num, lower_is_better)
-        return f"{emoji} *{label}*\n`{prev_label}: {p_str}  |  {curr_label}: {c_str}  |  {p}{icon}`"
+    def f(n, is_int=False):
+        if not n: return "—"
+        return str(round(n)) if is_int else f"₪{round(n):,}"
 
-    lines.append(row("💰", "מחזור",          prev["revenue"],  curr["revenue"]))
-    lines.append(row("📣", "תקציב פרסום",    prev["spend"],    curr["spend"]))
-    lines.append(row("🤝", "עסקאות",         prev["tx_count"], curr["tx_count"], is_int=True))
-    lines.append(row("📥", "עלות/ליד מתנה", prev_cpl,         curr_cpl,         lower_is_better=True))
-    lines.append(row("🎯", "עלות/ייעוץ",     prev_cpc,         curr_cpc,         lower_is_better=True))
-    lines.append(row("💸", "עלות/עסקה",      prev_cpt,         curr_cpt,         lower_is_better=True))
-    lines.append("")
-    lines.append("---")
-    lines.append("")
+    def diff(c, p, lower_is_better=False):
+        if not p: return ""
+        d = (c - p) / p * 100
+        better = (d < 0) if lower_is_better else (d > 0)
+        sign = "+" if d >= 0 else ""
+        icon = "✅" if better else "❌"
+        return f"{sign}{d:.1f}% {icon}"
+
+    # בניית טבלה
+    rows = [
+        ("ערך",            prev_label,                    curr_label,                    "שינוי"),
+        ("─" * 14,         "─" * 10,                      "─" * 10,                      "─" * 10),
+        ("💰 מחזור",       f(prev["revenue"]),             f(curr["revenue"]),             diff(curr["revenue"],  prev["revenue"])),
+        ("📣 תקציב",       f(prev["spend"]),               f(curr["spend"]),               diff(curr["spend"],    prev["spend"])),
+        ("🤝 עסקאות",      f(prev["tx_count"], True),      f(curr["tx_count"], True),      diff(curr["tx_count"], prev["tx_count"])),
+        ("📥 עלות/ליד",   f(prev_cpl),                    f(curr_cpl),                    diff(curr_cpl,         prev_cpl,  lower_is_better=True)),
+        ("🎯 עלות/ייעוץ", f(prev_cpc),                    f(curr_cpc),                    diff(curr_cpc,         prev_cpc,  lower_is_better=True)),
+        ("💸 עלות/עסקה",  f(prev_cpt),                    f(curr_cpt),                    diff(curr_cpt,         prev_cpt,  lower_is_better=True)),
+    ]
+
+    col_w = [max(len(r[i]) for r in rows) + 1 for i in range(4)]
+    table_lines = [" | ".join(r[i].ljust(col_w[i]) for i in range(4)) for r in rows]
+    table = "\n".join(table_lines)
 
     # תובנה
     rev_change = curr["revenue"] - prev["revenue"]
     tx_change  = curr["tx_count"] - prev["tx_count"]
-
     if rev_change > 0 and tx_change > 0:
-        lines.append(f"💡 וואלה אחי — מחזור עלה ב-{fmt_ils(rev_change)} ועוד {tx_change} עסקאות. חודש חזק.")
+        insight = f"וואלה אחי — מחזור עלה ב-₪{round(abs(rev_change)):,} ועוד {tx_change} עסקאות. חודש חזק."
     elif rev_change < 0 and tx_change < 0:
-        lines.append(f"💡 תכלס, {curr_label} היה חלש יותר מ-{prev_label}. {fmt_ils(abs(rev_change))} פחות במחזור. תבדוק מה קרה.")
+        insight = f"תכלס, {curr_label} היה חלש יותר מ-{prev_label}. ₪{round(abs(rev_change)):,} פחות במחזור. תבדוק מה קרה."
     elif curr_cpl > 0 and prev_cpl > 0 and curr_cpl < prev_cpl:
-        lines.append(f"💡 עלות הליד ירדה — הפרסום עובד טוב יותר החודש. תמשיך ככה.")
+        insight = "עלות הליד ירדה — הפרסום עובד טוב יותר החודש. תמשיך ככה."
     else:
-        lines.append(f"💡 חודש יציב. תמשיך לעקוב אחרי עלות/עסקה.")
+        insight = "חודש יציב. תמשיך לעקוב אחרי עלות/עסקה."
 
-    lines.append("")
-    lines.append("יאללה קדימה, חודש טוב 💪")
-
-    return "\n".join(lines)
+    msg = (
+        f"אהלן אח יקר 👋\n"
+        f"יאללה נראה איך היה {curr_label}\n\n\n"
+        f"<b>📊 סיכום חודשי — {curr_label} {curr_year}</b>\n\n"
+        f"<pre>{table}</pre>\n\n"
+        f"💡 {insight}\n\n"
+        f"יאללה קדימה, חודש טוב 💪"
+    )
+    return msg
 
 # ─────────────────────────────────────────
 # שלח לטלגרם
 # ─────────────────────────────────────────
 def send_telegram(text):
-    payload = json.dumps({"chat_id": TG_CHAT_ID, "text": text, "parse_mode": "Markdown"}).encode()
+    payload = json.dumps({"chat_id": TG_CHAT_ID, "text": text, "parse_mode": "HTML"}).encode()
     req = urllib.request.Request(
         f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
         data=payload,
