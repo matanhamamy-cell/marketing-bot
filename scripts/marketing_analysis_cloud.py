@@ -184,7 +184,7 @@ def analyze(metrics):
         return "stop"
 
     sorted_metrics = sorted(
-        [m for m in metrics if m["budget"] >= 50],
+        [m for m in metrics if m["budget"] >= 50 and m["active"]],
         key=cpg_of
     )
 
