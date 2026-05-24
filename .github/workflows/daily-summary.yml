@@ -2,8 +2,8 @@ name: Daily Summary
 
 on:
   schedule:
-    # כל יום ב-20:00 שעון ישראל (קיץ = UTC+3) → 17:00 UTC
-    - cron: '0 17 * * *'
+    # ראשון–חמישי ב-20:00 שעון ישראל (קיץ = UTC+3) → 17:00 UTC
+    - cron: '0 17 * * 0-4'
   workflow_dispatch:
 
 jobs:
