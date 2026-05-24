@@ -172,36 +172,30 @@ def build_message(curr, prev):
     lines.append("")
 
     lines.append(f"📊 *סיכום חודשי — {curr_label} {curr_year}*")
+    lines.append(f"_{prev_label} מול {curr_label}_")
     lines.append("")
 
-    # טבלת השוואה — raw numbers לחישוב, fmt לתצוגה
-    def row(label, p_num, c_num, lower_is_better=False, fmt=fmt_ils):
-        p_str  = fmt(p_num) if p_num else "—"
-        c_str  = fmt(c_num) if c_num else "—"
-        p_text = pct(c_num, p_num)
-        icon   = change_icon(c_num, p_num, lower_is_better)
-        return f"{label}\n  {prev_label}: {p_str}  →  {curr_label}: {c_str}  ({p_text}{icon})"
-
-    lines.append(row("💰 מחזור", prev["revenue"], curr["revenue"]))
-    lines.append("")
-    lines.append(row("📣 תקציב פרסום", prev["spend"], curr["spend"]))
-    lines.append("")
-    lines.append(row("🤝 עסקאות", prev["tx_count"], curr["tx_count"], fmt=str))
-    lines.append("")
-
-    prev_cpl = prev["spend"] / prev["gifts"] if prev["gifts"] > 0 else 0
-    curr_cpl = curr["spend"] / curr["gifts"] if curr["gifts"] > 0 else 0
-    lines.append(row("📥 עלות/ליד מתנה", prev_cpl, curr_cpl, lower_is_better=True))
-    lines.append("")
-
+    prev_cpl = prev["spend"] / prev["gifts"]    if prev["gifts"]    > 0 else 0
+    curr_cpl = curr["spend"] / curr["gifts"]    if curr["gifts"]    > 0 else 0
     prev_cpc = prev["spend"] / prev["consults"] if prev["consults"] > 0 else 0
     curr_cpc = curr["spend"] / curr["consults"] if curr["consults"] > 0 else 0
-    lines.append(row("🎯 עלות/ייעוץ", prev_cpc, curr_cpc, lower_is_better=True))
-    lines.append("")
-
     prev_cpt = prev["spend"] / prev["tx_count"] if prev["tx_count"] > 0 else 0
     curr_cpt = curr["spend"] / curr["tx_count"] if curr["tx_count"] > 0 else 0
-    lines.append(row("💸 עלות/עסקה", prev_cpt, curr_cpt, lower_is_better=True))
+
+    def row(emoji, label, p_num, c_num, lower_is_better=False, is_int=False):
+        fmt = str if is_int else fmt_ils
+        p_str = fmt(round(p_num)) if p_num else "—"
+        c_str = fmt(round(c_num)) if c_num else "—"
+        p     = pct(c_num, p_num)
+        icon  = change_icon(c_num, p_num, lower_is_better)
+        return f"{emoji} *{label}*\n`{prev_label}: {p_str}  |  {curr_label}: {c_str}  |  {p}{icon}`"
+
+    lines.append(row("💰", "מחזור",          prev["revenue"],  curr["revenue"]))
+    lines.append(row("📣", "תקציב פרסום",    prev["spend"],    curr["spend"]))
+    lines.append(row("🤝", "עסקאות",         prev["tx_count"], curr["tx_count"], is_int=True))
+    lines.append(row("📥", "עלות/ליד מתנה", prev_cpl,         curr_cpl,         lower_is_better=True))
+    lines.append(row("🎯", "עלות/ייעוץ",     prev_cpc,         curr_cpc,         lower_is_better=True))
+    lines.append(row("💸", "עלות/עסקה",      prev_cpt,         curr_cpt,         lower_is_better=True))
     lines.append("")
     lines.append("---")
     lines.append("")
