@@ -182,19 +182,24 @@ def build_message(curr, prev):
         icon = "✅" if better else "❌"
         return f"{sign}{d:.1f}% {icon}"
 
-    def line(emoji, label, p_num, c_num, lower_is_better=False, is_int=False):
-        p_str = str(round(p_num)) if is_int else f(p_num)
-        c_str = str(round(c_num)) if is_int else f(c_num)
-        d     = diff(c_num, p_num, lower_is_better)
-        return f"{emoji} {label}: {p_str} ← {c_str}   {d}"
+    rows = [
+        ("מדד",                "ערך"),
+        ("─" * 18,             "─" * 10),
+        ("💰 מחזור חודשי",    f(curr["revenue"])),
+        ("📣 תקציב כולל",     f(curr["spend"])),
+        ("🤝 עסקאות",         str(curr["tx_count"])),
+        ("📥 עלות/ליד",       f(curr_cpl)),
+        ("🎯 עלות/ייעוץ",     f(curr_cpc)),
+        ("💸 עלות/עסקה",      f(curr_cpt)),
+    ]
+    col0 = max(len(r[0]) for r in rows) + 2
+    table = "\n".join(r[0].ljust(col0) + r[1] for r in rows)
 
     # תובנה
-    rev_change = curr["revenue"] - prev["revenue"]
-    tx_change  = curr["tx_count"] - prev["tx_count"]
-    if rev_change > 0 and tx_change > 0:
-        insight = f"וואלה אחי — מחזור עלה ב-₪{round(abs(rev_change)):,} ועוד {tx_change} עסקאות. חודש חזק."
-    elif rev_change < 0 and tx_change < 0:
-        insight = f"תכלס, {curr_label} היה חלש יותר מ-{prev_label}. ₪{round(abs(rev_change)):,} פחות במחזור. תבדוק מה קרה."
+    if curr["revenue"] > prev["revenue"] and curr["tx_count"] > prev["tx_count"]:
+        insight = f"וואלה אחי — חודש חזק. מחזור ועסקאות עלו. תמשיך ככה."
+    elif curr["revenue"] < prev["revenue"] and curr["tx_count"] < prev["tx_count"]:
+        insight = f"תכלס, {curr_label} היה חלש יותר מ-{prev_label}. תבדוק מה קרה ותתקן."
     elif curr_cpl > 0 and prev_cpl > 0 and curr_cpl < prev_cpl:
         insight = "עלות הליד ירדה — הפרסום עובד טוב יותר החודש. תמשיך ככה."
     else:
@@ -203,14 +208,8 @@ def build_message(curr, prev):
     msg = (
         f"אהלן אח יקר 👋\n"
         f"יאללה נראה איך היה {curr_label}\n\n\n"
-        f"<b>📊 סיכום חודשי — {curr_label} {curr_year}</b>\n"
-        f"<i>{prev_label} ← {curr_label}</i>\n\n"
-        f"{line('💰', 'מחזור',       prev['revenue'],  curr['revenue'])}\n"
-        f"{line('📣', 'תקציב',       prev['spend'],    curr['spend'])}\n"
-        f"{line('🤝', 'עסקאות',      prev['tx_count'], curr['tx_count'], is_int=True)}\n"
-        f"{line('📥', 'עלות/ליד',   prev_cpl,         curr_cpl,         lower_is_better=True)}\n"
-        f"{line('🎯', 'עלות/ייעוץ', prev_cpc,         curr_cpc,         lower_is_better=True)}\n"
-        f"{line('💸', 'עלות/עסקה',  prev_cpt,         curr_cpt,         lower_is_better=True)}\n\n"
+        f"<b>📊 סיכום חודשי — {curr_label} {curr_year}</b>\n\n"
+        f"<pre>{table}</pre>\n\n"
         f"💡 {insight}\n\n"
         f"יאללה קדימה, חודש טוב 💪"
     )
