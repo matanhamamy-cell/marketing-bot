@@ -19,10 +19,21 @@ MONDAY_DATE_COL    = os.environ.get("MONDAY_DATE_COL",       "date__1")
 TG_TOKEN           = os.environ["TG_TOKEN"]
 TG_CHAT_ID         = os.environ["TG_CHAT_ID"]
 
-# ── תאריכים: תחילת החודש עד היום ──
-today      = date.today()
-start_date = today.replace(day=1).isoformat()
-end_date   = today.isoformat()
+# ── תאריכים לפי יום הריצה ──
+# ראשון (weekday=6): ד' עד מוצ"ש שעברו
+# רביעי (weekday=2): ראשון עד שלישי שעברו
+today   = date.today()
+weekday = today.weekday()
+
+if weekday == 6:   # ראשון
+    start_date = (today - timedelta(days=4)).isoformat()  # רביעי
+    end_date   = (today - timedelta(days=1)).isoformat()  # שבת
+elif weekday == 2:  # רביעי
+    start_date = (today - timedelta(days=3)).isoformat()  # ראשון
+    end_date   = (today - timedelta(days=1)).isoformat()  # שלישי
+else:
+    start_date = (today - timedelta(days=3)).isoformat()
+    end_date   = (today - timedelta(days=1)).isoformat()
 
 print(f"[INFO] Period: {start_date} → {end_date}")
 
