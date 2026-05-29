@@ -42,7 +42,6 @@ jobs:
           MONDAY_DATE_COL:             ${{ secrets.MONDAY_DATE_COL }}
           TG_TOKEN:                    ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID:                  ${{ secrets.TG_CHAT_ID }}
-          ANTHROPIC_API_KEY:           ${{ secrets.ANTHROPIC_API_KEY }}
         run: python scripts/daily_summary_cloud.py
 
       - name: Mark as sent
