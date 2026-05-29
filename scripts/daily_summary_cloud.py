@@ -14,6 +14,7 @@ MONDAY_SOURCE_COL        = os.environ.get("MONDAY_SOURCE_COL", "status1__1")
 MONDAY_DATE_COL          = os.environ.get("MONDAY_DATE_COL",   "date__1")
 TG_TOKEN                 = os.environ["TG_TOKEN"]
 TG_CHAT_ID               = os.environ["TG_CHAT_ID"]
+ANTHROPIC_API_KEY        = os.environ.get("ANTHROPIC_API_KEY", "")
 
 today      = date.today()
 today_str  = today.isoformat()
@@ -126,9 +127,59 @@ def fetch_leads_today():
     return {"gift": gift, "consult": consult, "bio": bio, "total": total}
 
 # ─────────────────────────────────────────
+# תובנה מ-AI
+# ─────────────────────────────────────────
+def get_ai_insight(tx, leads):
+    if not ANTHROPIC_API_KEY:
+        return None
+    try:
+        prompt = (
+            f"אתה עוזר עסקי של מתן שמוכר קורסים ב-eBay.\n"
+            f"נתוני היום ({today_str}):\n"
+            f"- עסקאות היום: {tx['today_count']} | הכנסה היום: ₪{round(tx['today_rev']):,}\n"
+            f"- עסקאות החודש: {tx['month_count']} | מחזור חודשי: ₪{round(tx['month_rev']):,}\n"
+            f"- לידים היום: מתנה={leads['gift']}, ייעוץ={leads['consult']}, ביו={leads['bio']}, סה\"כ={leads['total']}\n\n"
+            f"כתוב תובנה קצרה (2-3 משפטים) בעברית, ישיר ובגובה העיניים. "
+            f"התייחס למספרים הספציפיים. אל תכתוב כותרת."
+        )
+        body = json.dumps({
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 150,
+            "messages": [{"role": "user", "content": prompt}]
+        }).encode()
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+            },
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=30) as r:
+            result = json.loads(r.read())
+        return result["content"][0]["text"].strip()
+    except Exception as e:
+        print(f"[WARN] AI insight failed: {e}")
+        return None
+
+def fallback_insight(tx, leads):
+    if tx["today_count"] >= 3:
+        return "וואלה אחי, יום טוב. תמשיך ככה."
+    elif tx["today_count"] >= 1 and leads["total"] >= 5:
+        return "יש לידים, יש עסקאות — הגלגל מסתובב. תמשיך לדחוף."
+    elif tx["today_count"] == 0 and leads["total"] >= 5:
+        return "לידים יש, עסקאות אין — בוא נסגור יותר. מה עוצר אותנו?"
+    elif tx["today_count"] == 0 and leads["total"] == 0:
+        return "אפס עסקאות, אפס לידים היום. חאלס, מחר תפצה."
+    else:
+        return "תכלס לא כל יום יהיה מטורף — אבל תבדוק מה אפשר לדחוף."
+
+# ─────────────────────────────────────────
 # בניית הודעה
 # ─────────────────────────────────────────
-def build_message(tx, leads):
+def build_message(tx, leads, insight):
     d = f"{today_str[8:10]}/{today_str[5:7]}"
 
     # פתיחה לפי ביצועים
@@ -168,16 +219,7 @@ def build_message(tx, leads):
 
     # תובנה
     lines.append("⚡ *תובנה יומית*")
-    if tx["today_count"] >= 3:
-        lines.append("וואלה אחי, יום טוב. תמשיך ככה.")
-    elif tx["today_count"] >= 1 and leads["total"] >= 5:
-        lines.append("יש לידים, יש עסקאות — הגלגל מסתובב. תמשיך לדחוף.")
-    elif tx["today_count"] == 0 and leads["total"] >= 5:
-        lines.append("לידים יש, עסקאות אין — בוא נסגור יותר. מה עוצר אותנו?")
-    elif tx["today_count"] == 0 and leads["total"] == 0:
-        lines.append("אפס עסקאות, אפס לידים היום. חאלס, מחר תפצה.")
-    else:
-        lines.append("תכלס לא כל יום יהיה מטורף — אבל תבדוק מה אפשר לדחוף.")
+    lines.append(insight)
 
     lines.append("")
     lines.append("יאללה קדימה, תעשה מה שצריך 💪")
@@ -206,9 +248,11 @@ def send_telegram(text):
 # Main
 # ─────────────────────────────────────────
 if __name__ == "__main__":
-    tx    = fetch_transactions()
-    leads = fetch_leads_today()
-    msg   = build_message(tx, leads)
+    tx      = fetch_transactions()
+    leads   = fetch_leads_today()
+    print("[INFO] Generating AI insight...")
+    insight = get_ai_insight(tx, leads) or fallback_insight(tx, leads)
+    msg     = build_message(tx, leads, insight)
     print("\n--- MESSAGE PREVIEW ---")
     print(msg)
     print("---\n")
