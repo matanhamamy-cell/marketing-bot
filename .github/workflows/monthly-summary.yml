@@ -2,8 +2,12 @@ name: Monthly Summary
 
 on:
   schedule:
-    # 1 לכל חודש ב-09:00 שעון ישראל (קיץ = UTC+3) → 06:00 UTC
+    # ניסיון ראשון: 1 לחודש ב-09:00 ישראל (קיץ) → 06:00 UTC
     - cron: '0 6 1 * *'
+    # גיבוי: 2 לחודש — אם ה-1 פוספס
+    - cron: '0 6 2 * *'
+    # גיבוי: 3 לחודש — אם ה-2 גם פוספס
+    - cron: '0 6 3 * *'
   workflow_dispatch:
 
 jobs:
@@ -12,15 +16,15 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Set run date
-        run: echo "RUN_DATE=$(date +%Y-%m-%d)" >> $GITHUB_ENV
+      - name: Set run month
+        run: echo "RUN_MONTH=$(date +%Y-%m)" >> $GITHUB_ENV
 
-      - name: Check if already sent today
+      - name: Check if already sent this month
         id: cache
         uses: actions/cache@v4
         with:
           path: .sent-marker
-          key: monthly-${{ env.RUN_DATE }}
+          key: monthly-${{ env.RUN_MONTH }}
 
       - name: Checkout
         if: steps.cache.outputs.cache-hit != 'true'
