@@ -1,0 +1,40 @@
+name: New Student Alert
+
+on:
+  schedule:
+    # every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore last-check state
+        uses: actions/cache@v4
+        with:
+          path: /tmp/last_student_check.txt
+          key: new-student-state-${{ github.run_id }}
+          restore-keys: |
+            new-student-state-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run alert script
+        env:
+          MONDAY_API_TOKEN:  ${{ secrets.MONDAY_API_TOKEN }}
+          SCHOOLER_API_KEY:  ${{ secrets.SCHOOLER_API_KEY }}
+          TG_TOKEN:          ${{ secrets.TG_TOKEN }}
+          TG_CHAT_ID:        ${{ secrets.TG_CHAT_ID }}
+        run: python scripts/new_student_alert.py
