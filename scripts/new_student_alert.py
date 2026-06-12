@@ -157,6 +157,11 @@ def main() -> None:
         save_last_check(now)
         return
 
+    if not SCHOOLER_CLIENT_ID:
+        print("Schooler credentials not configured yet — skipping.")
+        save_last_check(now)
+        return
+
     print(f"Found {len(new_items)} new item(s). Getting Schooler token...")
     schooler_token = get_schooler_token()
 
