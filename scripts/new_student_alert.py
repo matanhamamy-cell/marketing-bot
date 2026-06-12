@@ -5,24 +5,35 @@ import requests
 from datetime import datetime, timedelta, timezone
 
 MONDAY_API_TOKEN = os.environ['MONDAY_API_TOKEN']
-SCHOOLER_API_KEY = os.environ['SCHOOLER_API_KEY']
-TG_TOKEN = os.environ['TG_TOKEN']
-TG_CHAT_ID = os.environ['TG_CHAT_ID']
+SCHOOLER_CLIENT_ID = os.environ.get('SCHOOLER_CLIENT_ID', '')
+SCHOOLER_CLIENT_SECRET = os.environ.get('SCHOOLER_CLIENT_SECRET', '')
+SCHOOLER_USER_ID = os.environ.get('SCHOOLER_USER_ID', '')
+SCHOOLER_USER_SECRET = os.environ.get('SCHOOLER_USER_SECRET', '')
 
 MONDAY_BOARD_ID = 1722246362
 SCHOOLER_BASE = 'https://api.schooler.biz'
+GREEN_BASE = 'https://api.green-api.com'
 STATE_FILE = '/tmp/last_student_check.txt'
+
+# GREEN API instance per salesperson (as they appear in Monday)
+SALES_AGENTS = {
+    'אושרי דסטה': {'instance_id': '7103193002',  'token': '79b12afa3286491f9b3ef61723f4bfbf501e7b79b3654cfa84'},
+    'אופק ביטון':  {'instance_id': '7103363572',  'token': '80829464b03e4ca6bd51b1fe2296ec503e4ff131804a4dc1b4'},
+    'יוסף טהרני':  {'instance_id': '7103411404',  'token': 'b7b7f8ee783b4efc977c2a1136fe545e5339720e4f0d4eb996'},
+    'יובל סידיס':  {'instance_id': '7103363573',  'token': '2b06d8cf55cb4f2e8878bf99e4373ef1d8bb7ff8ae33417b8b'},
+    'נציג 2':       {'instance_id': '7103363573',  'token': '2b06d8cf55cb4f2e8878bf99e4373ef1d8bb7ff8ae33417b8b'},
+}
 
 
 def get_monday_new_items(since: datetime) -> list:
     query = """
     query($board_id: ID!) {
         boards(ids: [$board_id]) {
-            items_page(limit: 100) {
+            items_page(limit: 100, query_params: {order_by: [{column_id: "__creation_log__", direction: desc}]}) {
                 items {
                     id
                     created_at
-                    column_values(ids: ["text__1", "phone__1"]) {
+                    column_values(ids: ["text__1", "phone__1", "color_mkxsr8f9"]) {
                         id
                         text
                     }
@@ -48,26 +59,49 @@ def get_monday_new_items(since: datetime) -> list:
     return new_items
 
 
-def extract_columns(item: dict) -> tuple[str | None, str | None]:
-    name = phone = None
+def extract_columns(item: dict) -> tuple[str | None, str | None, str | None]:
+    name = phone = agent = None
     for col in item['column_values']:
         if col['id'] == 'text__1':
             name = col['text'] or None
         elif col['id'] == 'phone__1':
-            # normalize: keep digits and leading +
             raw = col['text'] or ''
             phone = re.sub(r'[^\d+]', '', raw) or None
-    return name, phone
+        elif col['id'] == 'color_mkxsr8f9':
+            agent = col['text'] or None
+    return name, phone, agent
 
 
-def schooler_headers() -> dict:
-    return {'Authorization': f'Bearer {SCHOOLER_API_KEY}'}
+def format_phone_for_whatsapp(phone: str) -> str:
+    # Israeli number: 05XXXXXXXX → 9725XXXXXXXX@c.us
+    digits = re.sub(r'[^\d]', '', phone)
+    if digits.startswith('0'):
+        digits = '972' + digits[1:]
+    elif not digits.startswith('972'):
+        digits = '972' + digits
+    return f'{digits}@c.us'
 
 
-def search_student(phone: str) -> str | None:
+def get_schooler_token() -> str:
+    resp = requests.post(
+        f'{SCHOOLER_BASE}/oauth/token',
+        json={
+            'grant_type': 'password',
+            'client_id': SCHOOLER_CLIENT_ID,
+            'client_secret': SCHOOLER_CLIENT_SECRET,
+            'user_id': SCHOOLER_USER_ID,
+            'user_secret': SCHOOLER_USER_SECRET,
+        },
+        timeout=15,
+    )
+    resp.raise_for_status()
+    return resp.json()['access_token']
+
+
+def search_student(token: str, phone: str) -> str | None:
     resp = requests.get(
         f'{SCHOOLER_BASE}/api/v1/students/search',
-        headers=schooler_headers(),
+        headers={'Authorization': f'Bearer {token}'},
         params={'phone': phone},
         timeout=15,
     )
@@ -78,35 +112,31 @@ def search_student(phone: str) -> str | None:
     return None
 
 
-def get_unique_link(student_id: str) -> str | None:
+def get_unique_link(token: str, student_id: str) -> str | None:
     resp = requests.get(
         f'{SCHOOLER_BASE}/api/v1/students/{student_id}/unique_link',
-        headers=schooler_headers(),
+        headers={'Authorization': f'Bearer {token}'},
         timeout=15,
     )
     resp.raise_for_status()
     return resp.json().get('unique_link')
 
 
-def send_telegram(name: str, link: str) -> None:
-    text = f"\U0001f393 תלמיד חדש נרשם\!\n\n*{name}*\n[כניסה לפורטל]({link})"
-    requests.post(
-        f'https://api.telegram.org/bot{TG_TOKEN}/sendMessage',
-        json={
-            'chat_id': TG_CHAT_ID,
-            'text': text,
-            'parse_mode': 'MarkdownV2',
-            'disable_web_page_preview': False,
-        },
+def send_whatsapp(instance_id: str, token: str, student_phone: str, name: str, link: str) -> None:
+    chat_id = format_phone_for_whatsapp(student_phone)
+    message = f"לינק ישיר לצפייה בפורטל הדיגיטלי {name}\n{link}"
+    resp = requests.post(
+        f'{GREEN_BASE}/waInstance{instance_id}/sendMessage/{token}',
+        json={'chatId': chat_id, 'message': message},
         timeout=15,
-    ).raise_for_status()
+    )
+    resp.raise_for_status()
 
 
 def load_last_check() -> datetime:
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE) as f:
             return datetime.fromisoformat(f.read().strip())
-    # first run: look back 10 minutes to avoid missing anything
     return datetime.now(timezone.utc) - timedelta(minutes=10)
 
 
@@ -127,42 +157,42 @@ def main() -> None:
         save_last_check(now)
         return
 
-    print(f"Found {len(new_items)} new item(s).")
+    print(f"Found {len(new_items)} new item(s). Getting Schooler token...")
+    schooler_token = get_schooler_token()
 
     errors = []
     for item in new_items:
         item_id = item['id']
-        name, phone = extract_columns(item)
+        name, phone, agent = extract_columns(item)
 
         if not name or not phone:
-            msg = f"Item {item_id}: missing name or phone (name={name}, phone={phone})"
-            print(msg)
-            errors.append(msg)
-            continue
+            msg = f"Item {item_id}: missing name or phone"
+            print(msg); errors.append(msg); continue
 
-        print(f"Processing: {name} ({phone})")
+        if not agent or agent not in SALES_AGENTS:
+            msg = f"Item {item_id} ({name}): unknown agent '{agent}'"
+            print(msg); errors.append(msg); continue
 
-        student_id = search_student(phone)
+        print(f"Processing: {name} ({phone}) — נציג: {agent}")
+
+        student_id = search_student(schooler_token, phone)
         if not student_id:
-            msg = f"Student not found in Schooler for phone {phone}"
-            print(msg)
-            errors.append(msg)
-            continue
+            msg = f"{name}: not found in Schooler (phone {phone})"
+            print(msg); errors.append(msg); continue
 
-        link = get_unique_link(student_id)
+        link = get_unique_link(schooler_token, student_id)
         if not link:
-            msg = f"No unique_link returned for student {student_id}"
-            print(msg)
-            errors.append(msg)
-            continue
+            msg = f"{name}: no unique_link from Schooler"
+            print(msg); errors.append(msg); continue
 
-        send_telegram(name, link)
-        print(f"Sent Telegram for {name}")
+        green = SALES_AGENTS[agent]
+        send_whatsapp(green['instance_id'], green['token'], phone, name, link)
+        print(f"WhatsApp sent to {name} via {agent}")
 
     save_last_check(now)
 
     if errors:
-        print(f"\n{len(errors)} error(s) encountered:")
+        print(f"\n{len(errors)} error(s):")
         for e in errors:
             print(f"  - {e}")
         sys.exit(1)

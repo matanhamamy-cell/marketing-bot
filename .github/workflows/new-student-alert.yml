@@ -33,8 +33,9 @@ jobs:
 
       - name: Run alert script
         env:
-          MONDAY_API_TOKEN:  ${{ secrets.MONDAY_API_TOKEN }}
-          SCHOOLER_API_KEY:  ${{ secrets.SCHOOLER_API_KEY }}
-          TG_TOKEN:          ${{ secrets.TG_TOKEN }}
-          TG_CHAT_ID:        ${{ secrets.TG_CHAT_ID }}
+          MONDAY_API_TOKEN:       ${{ secrets.MONDAY_API_TOKEN }}
+          SCHOOLER_CLIENT_ID:     ${{ secrets.SCHOOLER_CLIENT_ID }}
+          SCHOOLER_CLIENT_SECRET: ${{ secrets.SCHOOLER_CLIENT_SECRET }}
+          SCHOOLER_USER_ID:       ${{ secrets.SCHOOLER_USER_ID }}
+          SCHOOLER_USER_SECRET:   ${{ secrets.SCHOOLER_USER_SECRET }}
         run: python scripts/new_student_alert.py
