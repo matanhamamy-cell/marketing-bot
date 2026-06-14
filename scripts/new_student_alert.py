@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import re
 import sys
@@ -8,20 +10,21 @@ MONDAY_API_TOKEN = os.environ['MONDAY_API_TOKEN']
 SCHOOLER_CLIENT_ID = os.environ.get('SCHOOLER_CLIENT_ID', '')
 SCHOOLER_CLIENT_SECRET = os.environ.get('SCHOOLER_CLIENT_SECRET', '')
 SCHOOLER_USER_ID = os.environ.get('SCHOOLER_USER_ID', '')
-SCHOOLER_USER_SECRET = os.environ.get('SCHOOLER_USER_SECRET', '')
+TG_TOKEN = os.environ.get('TG_TOKEN', '')
+TG_CHAT_ID = os.environ.get('TG_CHAT_ID', '')
 
 MONDAY_BOARD_ID = 1722246362
 SCHOOLER_BASE = 'https://api.schooler.biz'
 GREEN_BASE = 'https://api.green-api.com'
 STATE_FILE = '/tmp/last_student_check.txt'
 
-# GREEN API instance per salesperson (as they appear in Monday)
+# GREEN API instance per salesperson — each agent receives the alert on their own WhatsApp
 SALES_AGENTS = {
-    'אושרי דסטה': {'instance_id': '7103193002',  'token': '79b12afa3286491f9b3ef61723f4bfbf501e7b79b3654cfa84'},
-    'אופק ביטון':  {'instance_id': '7103363572',  'token': '80829464b03e4ca6bd51b1fe2296ec503e4ff131804a4dc1b4'},
-    'יוסף טהרני':  {'instance_id': '7103411404',  'token': 'b7b7f8ee783b4efc977c2a1136fe545e5339720e4f0d4eb996'},
-    'יובל סידיס':  {'instance_id': '7103363573',  'token': '2b06d8cf55cb4f2e8878bf99e4373ef1d8bb7ff8ae33417b8b'},
-    'נציג 2':       {'instance_id': '7103363573',  'token': '2b06d8cf55cb4f2e8878bf99e4373ef1d8bb7ff8ae33417b8b'},
+    'אושרי דסטה': {'instance_id': '7103193002', 'token': '79b12afa3286491f9b3ef61723f4bfbf501e7b79b3654cfa84', 'self_chat_id': '972523733014@c.us'},
+    'אופק ביטון':  {'instance_id': '7103363572', 'token': '80829464b03e4ca6bd51b1fe2296ec503e4ff131804a4dc1b4', 'self_chat_id': '972533783654@c.us'},
+    'יוסף טהרני':  {'instance_id': '7103411404', 'token': 'b7b7f8ee783b4efc977c2a1136fe545e5339720e4f0d4eb996', 'self_chat_id': '972523733671@c.us'},
+    'יובל סידיס':  {'instance_id': '7103363573', 'token': '2b06d8cf55cb4f2e8878bf99e4373ef1d8bb7ff8ae33417b8b', 'self_chat_id': '972523734216@c.us'},
+    'נציג 2':       {'instance_id': '7103363573', 'token': '2b06d8cf55cb4f2e8878bf99e4373ef1d8bb7ff8ae33417b8b', 'self_chat_id': '972523734216@c.us'},
 }
 
 
@@ -90,7 +93,6 @@ def get_schooler_token() -> str:
             'client_id': SCHOOLER_CLIENT_ID,
             'client_secret': SCHOOLER_CLIENT_SECRET,
             'user_id': SCHOOLER_USER_ID,
-            'user_secret': SCHOOLER_USER_SECRET,
         },
         timeout=15,
     )
@@ -99,6 +101,7 @@ def get_schooler_token() -> str:
 
 
 def search_student(token: str, phone: str) -> str | None:
+    """Returns unique_link for the student if found, else None."""
     resp = requests.get(
         f'{SCHOOLER_BASE}/api/v1/students/search',
         headers={'Authorization': f'Bearer {token}'},
@@ -106,31 +109,35 @@ def search_student(token: str, phone: str) -> str | None:
         timeout=15,
     )
     resp.raise_for_status()
-    results = resp.json()
-    if isinstance(results, list) and results:
-        return str(results[0]['id'])
-    return None
+    data = resp.json().get('data', [])
+    if not data:
+        return None
+    # unique_link is inside the first school entry
+    schools = data[0].get('schools', [])
+    if not schools:
+        return None
+    return schools[0].get('unique_link') or None
 
 
-def get_unique_link(token: str, student_id: str) -> str | None:
-    resp = requests.get(
-        f'{SCHOOLER_BASE}/api/v1/students/{student_id}/unique_link',
-        headers={'Authorization': f'Bearer {token}'},
-        timeout=15,
-    )
-    resp.raise_for_status()
-    return resp.json().get('unique_link')
-
-
-def send_whatsapp(instance_id: str, token: str, student_phone: str, name: str, link: str) -> None:
-    chat_id = format_phone_for_whatsapp(student_phone)
-    message = f"לינק ישיר לצפייה בפורטל הדיגיטלי {name}\n{link}"
+def send_whatsapp(instance_id: str, token: str, self_chat_id: str, student_name: str, link: str) -> None:
+    message = f"לינק ישיר לפורטל {student_name}:\n{link}"
     resp = requests.post(
         f'{GREEN_BASE}/waInstance{instance_id}/sendMessage/{token}',
-        json={'chatId': chat_id, 'message': message},
+        json={'chatId': self_chat_id, 'message': message},
         timeout=15,
     )
     resp.raise_for_status()
+
+
+def send_telegram(student_name: str, agent_name: str) -> None:
+    if not TG_TOKEN or not TG_CHAT_ID:
+        return
+    message = f"מתכלי תלמיד חדש נרשם! 🎉\n*{student_name}* | {agent_name}"
+    requests.post(
+        f'https://api.telegram.org/bot{TG_TOKEN}/sendMessage',
+        json={'chat_id': TG_CHAT_ID, 'text': message, 'parse_mode': 'Markdown'},
+        timeout=15,
+    )
 
 
 def load_last_check() -> datetime:
@@ -180,19 +187,15 @@ def main() -> None:
 
         print(f"Processing: {name} ({phone}) — נציג: {agent}")
 
-        student_id = search_student(schooler_token, phone)
-        if not student_id:
+        link = search_student(schooler_token, phone)
+        if not link:
             msg = f"{name}: not found in Schooler (phone {phone})"
             print(msg); errors.append(msg); continue
 
-        link = get_unique_link(schooler_token, student_id)
-        if not link:
-            msg = f"{name}: no unique_link from Schooler"
-            print(msg); errors.append(msg); continue
-
         green = SALES_AGENTS[agent]
-        send_whatsapp(green['instance_id'], green['token'], phone, name, link)
-        print(f"WhatsApp sent to {name} via {agent}")
+        send_whatsapp(green['instance_id'], green['token'], green['self_chat_id'], name, link)
+        send_telegram(name, agent)
+        print(f"WhatsApp sent to {agent} and Telegram sent about {name}")
 
     save_last_check(now)
 
