@@ -155,6 +155,9 @@ def send_telegram(student_name: str, agent_name: str) -> None:
 
 
 def load_last_check() -> datetime:
+    lookback = os.environ.get('LOOKBACK_HOURS', '').strip()
+    if lookback:
+        return datetime.now(timezone.utc) - timedelta(hours=float(lookback))
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE) as f:
             return datetime.fromisoformat(f.read().strip())

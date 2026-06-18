@@ -5,6 +5,11 @@ on:
     # every 5 minutes
     - cron: '*/5 * * * *'
   workflow_dispatch:
+    inputs:
+      lookback_hours:
+        description: 'Look back N hours instead of using saved state (for testing)'
+        required: false
+        default: ''
 
 jobs:
   alert:
@@ -39,4 +44,5 @@ jobs:
           SCHOOLER_USER_ID:       ${{ secrets.SCHOOLER_USER_ID }}
           TG_TOKEN:               ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID:             ${{ secrets.TG_CHAT_ID }}
+          LOOKBACK_HOURS:         ${{ github.event.inputs.lookback_hours }}
         run: python scripts/new_student_alert.py
