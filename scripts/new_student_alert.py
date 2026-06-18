@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+import time
 import requests
 from datetime import datetime, timedelta, timezone
 
@@ -100,23 +101,36 @@ def get_schooler_token() -> str:
     return resp.json()['access_token']
 
 
-def search_student(token: str, phone: str) -> str | None:
-    """Returns unique_link for the student if found, else None."""
-    resp = requests.get(
-        f'{SCHOOLER_BASE}/api/v1/students/search',
-        headers={'Authorization': f'Bearer {token}'},
-        params={'phone': phone},
+def search_student(token: str, phone: str, retries: int = 3, delay: int = 30) -> str | None:
+    """Returns unique_link for the student if found, else None. Retries if not found yet."""
+    for attempt in range(retries):
+        resp = requests.get(
+            f'{SCHOOLER_BASE}/api/v1/students/search',
+            headers={'Authorization': f'Bearer {token}'},
+            params={'phone': phone},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json().get('data', [])
+        if data:
+            schools = data[0].get('schools', [])
+            if schools:
+                return schools[0].get('unique_link') or None
+        if attempt < retries - 1:
+            print(f"  Not found yet, retrying in {delay}s... ({attempt + 1}/{retries - 1})")
+            time.sleep(delay)
+    return None
+
+
+def send_telegram_not_in_schooler(student_name: str, phone: str, agent_name: str) -> None:
+    if not TG_TOKEN or not TG_CHAT_ID:
+        return
+    message = f"⚠️ תלמיד חדש נרשם אבל לא נמצא בסקולר!\n*{student_name}* ({phone}) | {agent_name}\nבדוק ידנית."
+    requests.post(
+        f'https://api.telegram.org/bot{TG_TOKEN}/sendMessage',
+        json={'chat_id': TG_CHAT_ID, 'text': message, 'parse_mode': 'Markdown'},
         timeout=15,
     )
-    resp.raise_for_status()
-    data = resp.json().get('data', [])
-    if not data:
-        return None
-    # unique_link is inside the first school entry
-    schools = data[0].get('schools', [])
-    if not schools:
-        return None
-    return schools[0].get('unique_link') or None
 
 
 def send_whatsapp(instance_id: str, token: str, self_chat_id: str, student_name: str, link: str) -> None:
@@ -189,8 +203,9 @@ def main() -> None:
 
         link = search_student(schooler_token, phone)
         if not link:
-            msg = f"{name}: not found in Schooler (phone {phone})"
-            print(msg); errors.append(msg); continue
+            print(f"{name}: still not found in Schooler after retries — sending Telegram alert")
+            send_telegram_not_in_schooler(name, phone, agent)
+            continue
 
         green = SALES_AGENTS[agent]
         send_whatsapp(green['instance_id'], green['token'], green['self_chat_id'], name, link)
