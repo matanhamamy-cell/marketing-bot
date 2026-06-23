@@ -23,7 +23,7 @@ STATE_FILE = '/tmp/last_student_check.txt'
 SALES_AGENTS = {
     'אושרי דסטה': {'instance_id': '7103193002', 'token': '79b12afa3286491f9b3ef61723f4bfbf501e7b79b3654cfa84', 'self_chat_id': '972523733014@c.us'},
     'אופק ביטון':  {'instance_id': '7103363572', 'token': '80829464b03e4ca6bd51b1fe2296ec503e4ff131804a4dc1b4', 'self_chat_id': '972533783654@c.us'},
-    'יוסף טהרני':  {'instance_id': '7103411404', 'token': 'b7b7f8ee783b4efc977c2a1136fe545e5339720e4f0d4eb996', 'self_chat_id': '972523733671@c.us'},
+    'יוסף טהרני':  {'instance_id': '7103411404', 'token': 'b7b7f8ee783b4efc977c2a1136fe545e5339720e4f0d4eb996', 'self_chat_id': '972523733269@c.us'},
     'יובל סידיס':  {'instance_id': '7103363573', 'token': '2b06d8cf55cb4f2e8878bf99e4373ef1d8bb7ff8ae33417b8b', 'self_chat_id': '972523734216@c.us'},
     'נציג 2':       {'instance_id': '7103363573', 'token': '2b06d8cf55cb4f2e8878bf99e4373ef1d8bb7ff8ae33417b8b', 'self_chat_id': '972523734216@c.us'},
 }
