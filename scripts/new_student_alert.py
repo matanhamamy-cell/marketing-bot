@@ -154,6 +154,16 @@ def send_telegram(student_name: str, agent_name: str) -> None:
     )
 
 
+def send_telegram_link(student_name: str, link: str) -> None:
+    if not TG_TOKEN or not TG_CHAT_ID:
+        return
+    requests.post(
+        f'https://api.telegram.org/bot{TG_TOKEN}/sendMessage',
+        json={'chat_id': TG_CHAT_ID, 'text': f"לינק ישיר לפורטל {student_name}\n{link}"},
+        timeout=15,
+    )
+
+
 def load_last_check() -> datetime:
     lookback = os.environ.get('LOOKBACK_HOURS', '').strip()
     if lookback:
@@ -213,6 +223,7 @@ def main() -> None:
         green = SALES_AGENTS[agent]
         send_whatsapp(green['instance_id'], green['token'], green['self_chat_id'], name, link)
         send_telegram(name, agent)
+        send_telegram_link(name, link)
         print(f"WhatsApp sent to {agent} and Telegram sent about {name}")
 
     save_last_check(now)
