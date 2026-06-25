@@ -37,7 +37,7 @@ def get_monday_new_items(since: datetime) -> list:
                 items {
                     id
                     created_at
-                    column_values(ids: ["text__1", "phone__1", "color_mkxsr8f9"]) {
+                    column_values(ids: ["text__1", "phone__1", "email__1", "color_mkxsr8f9"]) {
                         id
                         text
                     }
@@ -63,17 +63,19 @@ def get_monday_new_items(since: datetime) -> list:
     return new_items
 
 
-def extract_columns(item: dict) -> tuple[str | None, str | None, str | None]:
-    name = phone = agent = None
+def extract_columns(item: dict) -> tuple[str | None, str | None, str | None, str | None]:
+    name = phone = agent = email = None
     for col in item['column_values']:
         if col['id'] == 'text__1':
             name = col['text'] or None
         elif col['id'] == 'phone__1':
             raw = col['text'] or ''
             phone = re.sub(r'[^\d+]', '', raw) or None
+        elif col['id'] == 'email__1':
+            email = col['text'] or None
         elif col['id'] == 'color_mkxsr8f9':
             agent = col['text'] or None
-    return name, phone, agent
+    return name, phone, email, agent
 
 
 def format_phone_for_whatsapp(phone: str) -> str:
@@ -154,12 +156,22 @@ def send_telegram(student_name: str, agent_name: str) -> None:
     )
 
 
-def send_telegram_link(student_name: str, link: str) -> None:
+def send_telegram_link(student_name: str, phone: str, email: str | None, link: str) -> None:
     if not TG_TOKEN or not TG_CHAT_ID:
         return
+    text = (
+        f"תלמיד חדש נכנס✅📲\n"
+        f"\n"
+        f"פרטים אישיים:\n"
+        f"שם מלא:  {student_name}\n"
+        f"מייל:  {email or '—'}\n"
+        f"מספר טלפון: {phone}\n"
+        f"\n"
+        f"לינק ישיר לפורטל:  {link}"
+    )
     requests.post(
         f'https://api.telegram.org/bot{TG_TOKEN}/sendMessage',
-        json={'chat_id': TG_CHAT_ID, 'text': f"לינק ישיר לפורטל {student_name}\n{link}"},
+        json={'chat_id': TG_CHAT_ID, 'text': text},
         timeout=15,
     )
 
@@ -202,7 +214,7 @@ def main() -> None:
     errors = []
     for item in new_items:
         item_id = item['id']
-        name, phone, agent = extract_columns(item)
+        name, phone, email, agent = extract_columns(item)
 
         if not name or not phone:
             msg = f"Item {item_id}: missing name or phone"
@@ -223,7 +235,7 @@ def main() -> None:
         green = SALES_AGENTS[agent]
         send_whatsapp(green['instance_id'], green['token'], green['self_chat_id'], name, link)
         send_telegram(name, agent)
-        send_telegram_link(name, link)
+        send_telegram_link(name, phone, email, link)
         print(f"WhatsApp sent to {agent} and Telegram sent about {name}")
 
     save_last_check(now)
