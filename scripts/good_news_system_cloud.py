@@ -222,8 +222,8 @@ def send_telegram(message):
 
 
 def main():
-    # בדוק שהיום הוא יום אחרון בחודש
-    if today.day != last_day:
+    force = os.environ.get("FORCE_RUN", "").lower() == "true"
+    if not force and today.day != last_day:
         print(f"היום {today.day}, היום האחרון הוא {last_day}. לא שולח.")
         sys.exit(0)
 

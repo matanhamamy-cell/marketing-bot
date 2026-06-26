@@ -5,6 +5,11 @@ on:
     # ימים 28-31 — הסקריפט בודק אם זה היום האחרון של החודש
     - cron: '0 6 28-31 * *'
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'הרץ גם אם לא יום אחרון בחודש (לבדיקה)'
+        required: false
+        default: 'false'
 
 jobs:
   send:
@@ -12,34 +17,18 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Set run month
-        run: echo "RUN_MONTH=$(date +%Y-%m)" >> $GITHUB_ENV
-
-      - name: Check if already sent this month
-        id: cache
-        uses: actions/cache@v4
-        with:
-          path: .good-news-marker
-          key: good-news-${{ env.RUN_MONTH }}
-
       - name: Checkout
-        if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
 
       - name: Set up Python
-        if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Run Good News System
-        if: steps.cache.outputs.cache-hit != 'true'
         env:
           MONDAY_API_TOKEN: ${{ secrets.MONDAY_API_TOKEN }}
           TG_TOKEN:         ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID:       ${{ secrets.TG_CHAT_ID }}
+          FORCE_RUN:        ${{ github.event.inputs.force }}
         run: python scripts/good_news_system_cloud.py
-
-      - name: Mark as sent
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: echo "sent" > .good-news-marker
