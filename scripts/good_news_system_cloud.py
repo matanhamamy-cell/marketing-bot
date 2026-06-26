@@ -173,23 +173,23 @@ def fetch_canceled_under_500():
     return results
 
 
-def build_messages(lo_sagar, canceled):
-    """מחזיר רשימת הודעות — אחת לכל נציג שיש לו נתונים."""
-    # איסוף כל הנציגים
+def build_message(lo_sagar, canceled):
+    """מחזיר הודעה אחת עם כל הנציגים."""
     agents = sorted(set(
         [p["agent"] for p in lo_sagar if p["agent"]] +
         [p["agent"] for p in canceled if p["agent"]]
     ))
 
-    # כותרת ראשית
-    messages = [f"📋 *סיסטם בשורות טובות — {month_label} {today.year}*"]
+    lines = [f"📋 *סיסטם בשורות טובות — {month_label} {today.year}*"]
 
     for agent in agents:
-        ag_canceled  = [p for p in canceled  if p["agent"] == agent]
-        ag_lo_sagar  = [p for p in lo_sagar  if p["agent"] == agent]
+        ag_canceled = [p for p in canceled if p["agent"] == agent]
+        ag_lo_sagar = [p for p in lo_sagar if p["agent"] == agent]
 
-        lines = [f"\n👤 *נציג {agent}*", ""]
+        lines.append("")
+        lines.append(f"👤 *נציג {agent}*")
 
+        lines.append("")
         lines.append("*ביטלו*")
         if ag_canceled:
             for p in ag_canceled:
@@ -205,9 +205,7 @@ def build_messages(lo_sagar, canceled):
         else:
             lines.append("אין")
 
-        messages.append("\n".join(lines))
-
-    return messages
+    return "\n".join(lines)
 
 
 def send_telegram(message):
@@ -235,10 +233,9 @@ def main():
     canceled = fetch_canceled_under_500()
     print(f"ביטלו: {len(canceled)}")
 
-    messages = build_messages(lo_sagar, canceled)
-    for msg in messages:
-        send_telegram(msg)
-        print("נשלח ✓")
+    message = build_message(lo_sagar, canceled)
+    send_telegram(message)
+    print("נשלח ✓")
 
     print("הכל נשלח!")
 
