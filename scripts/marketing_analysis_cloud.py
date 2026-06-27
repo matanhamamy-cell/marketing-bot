@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ניתוח שיווק שבועי — רץ ב-GitHub Actions כל ראשון ורביעי
+ניתוח שיווק שבועי — רץ ב-GitHub Actions כל ראשון ב-10:00
 מושך נתונים ישירות מ-Meta API + Monday.com ושולח לטלגרם
 """
 
@@ -19,21 +19,10 @@ MONDAY_DATE_COL    = os.environ.get("MONDAY_DATE_COL",       "date__1")
 TG_TOKEN           = os.environ["TG_TOKEN"]
 TG_CHAT_ID         = os.environ["TG_CHAT_ID"]
 
-# ── תאריכים לפי יום הריצה ──
-# ראשון (weekday=6): ד' עד מוצ"ש שעברו
-# רביעי (weekday=2): ראשון עד שלישי שעברו
-today   = date.today()
-weekday = today.weekday()
-
-if weekday == 6:   # ראשון
-    start_date = (today - timedelta(days=4)).isoformat()  # רביעי
-    end_date   = (today - timedelta(days=1)).isoformat()  # שבת
-elif weekday == 2:  # רביעי
-    start_date = (today - timedelta(days=3)).isoformat()  # ראשון
-    end_date   = (today - timedelta(days=1)).isoformat()  # שלישי
-else:
-    start_date = (today - timedelta(days=3)).isoformat()
-    end_date   = (today - timedelta(days=1)).isoformat()
+# ── תאריכים: השבוע המלא שעבר (ראשון–שבת) ──
+today      = date.today()
+start_date = (today - timedelta(days=7)).isoformat()  # ראשון שעבר
+end_date   = (today - timedelta(days=1)).isoformat()  # שבת
 
 print(f"[INFO] Period: {start_date} → {end_date}")
 
@@ -180,94 +169,88 @@ def analyze(metrics):
     total_gifts   = sum(m["gifts"]        for m in metrics)
     total_consult = sum(m["directLeads"]  for m in metrics)
     total_tx      = sum(m["transactions"] for m in metrics)
+    total_leads   = sum(m["totalLeads"]   for m in metrics)
 
-    avg_cpg     = total_budget / total_gifts   if total_gifts   > 0 else 0
-    avg_cpc     = total_budget / total_consult if total_consult > 0 else 0
-    avg_cpt     = total_budget / total_tx      if total_tx      > 0 else 0
-    tx_rate_pct = (total_tx / total_gifts * 100) if total_gifts > 0 else 0
+    avg_cpg  = total_budget / total_gifts   if total_gifts   > 0 else 0
+    avg_cpc  = total_budget / total_consult if total_consult > 0 else 0
+    avg_cpt  = total_budget / total_tx      if total_tx      > 0 else 0
+    conv_pct = (total_tx / total_gifts * 100) if total_gifts > 0 else 0
 
     def cpg_of(m): return m["budget"] / m["gifts"] if m["gifts"] > 0 else float("inf")
     def status(m):
         cpg = cpg_of(m)
-        if not m["active"]:                                    return "off"
-        if cpg <= 21:                                          return "excellent"
-        if cpg <= 35:                                          return "decent"
+        if not m["active"]: return "off"
+        if cpg <= 21:       return "excellent"
+        if cpg <= 35:       return "decent"
         return "stop"
 
-    sorted_metrics = sorted(
-        [m for m in metrics if m["budget"] >= 50 and m["active"]],
+    d_start = f"{start_date[8:10]}/{start_date[5:7]}"
+    d_end   = f"{end_date[8:10]}/{end_date[5:7]}"
+
+    active_metrics = sorted(
+        [m for m in metrics if m["active"] and m["budget"] >= 50],
+        key=cpg_of
+    )
+    off_good = sorted(
+        [m for m in metrics if not m["active"] and m["budget"] >= 50 and cpg_of(m) <= 25 and m["gifts"] >= 5],
         key=cpg_of
     )
 
     lines = []
 
-    # פתיחה
-    lines.append("אהלן אח שלי 👋")
-    lines.append("יאללה נראה מה קרה השבוע בפרסום")
-    lines.append("")
+    # ─── כותרת ───
+    lines.append(f"📊 *דוח שיווק שבועי | {d_start}–{d_end}*")
     lines.append("")
 
-    # כותרת
-    d_start = f"{start_date[8:10]}/{start_date[5:7]}"
-    d_end   = f"{end_date[8:10]}/{end_date[5:7]}"
-    lines.append(f"📊 *ניתוח שיווק שבועי*")
-    lines.append(f"תאריכים: {d_start} עד {d_end}")
-    lines.append(f"תקציב כולל: ₪{round(total_budget)}")
-    lines.append(f"לידים מתנות: {total_gifts} | עלות/מתנה: ₪{round(avg_cpg) if avg_cpg else '—'}")
-    lines.append(f"לידים ייעוץ: {total_consult} | עלות/ייעוץ: ₪{round(avg_cpc) if total_consult else '—'}")
-    lines.append(f"עסקאות: {total_tx} | עלות/עסקה: ₪{round(avg_cpt) if total_tx else '—'} | המרה: {tx_rate_pct:.1f}%")
-    lines.append("")
-    lines.append("---")
+    # ─── סיכום מדדים ───
+    lines.append(f"💸 תקציב: ₪{round(total_budget):,}")
+    lines.append(f"🎁 עלות מתנה: ₪{round(avg_cpg) if avg_cpg else '—'} | {total_gifts} לידים")
+    lines.append(f"💬 עלות ייעוץ: ₪{round(avg_cpc) if avg_cpc else '—'} | {total_consult} לידים")
+    lines.append(f"🤝 עלות עסקה: ₪{round(avg_cpt) if avg_cpt else '—'} | {total_tx} עסקאות")
+    lines.append(f"📈 המרה מתנה→עסקה: {conv_pct:.1f}%")
     lines.append("")
 
-    # ביצועים לפי סדרה
-    lines.append("📋 *ביצועים לפי סדרה*")
-    lines.append("_(מסדר מהזול לגבוה לפי עלות/מתנה)_")
-    lines.append("")
+    # ─── סדרות ───
+    if active_metrics:
+        lines.append("─────────────────")
+        icon_map = {"excellent": "✅", "decent": "⚠️", "stop": "❌"}
+        for m in active_metrics:
+            cpg  = cpg_of(m)
+            icon = icon_map[status(m)]
+            cpg_str = f"₪{round(cpg)}" if cpg != float("inf") else "—"
+            cpc_str = f"₪{round(m['costPerLeadDirect'])}" if m["directLeads"] > 0 else "—"
+            cpt_str = f"₪{round(m['costPerTransaction'])}" if m["transactions"] > 0 else "—"
+            lines.append(f"{icon} *{m['adSetName']}*")
+            lines.append(f"  ₪{round(m['budget']):,} | מתנה {cpg_str} | ייעוץ {cpc_str} | עסקה {cpt_str} ({m['transactions']})")
+            lines.append("")
 
-    for m in sorted_metrics:
-        cpg = cpg_of(m)
-        s   = status(m)
-        icon = {"excellent": "✅", "decent": "⚠️", "stop": "❌", "off": "❌"}[s]
-        cpg_str = f"₪{cpg:.1f}" if cpg != float("inf") else "—"
-        lines.append(f"{icon} *{m['adSetName']}*")
-        lines.append(f"  תקציב: ₪{round(m['budget'])} | עלות/מתנה: {cpg_str} | עסקאות: {m['transactions']}")
+    if off_good:
+        lines.append("⏸ *כבויות — ביצועים טובים:*")
+        for m in off_good:
+            cpg_str = f"₪{round(cpg_of(m))}" if cpg_of(m) != float("inf") else "—"
+            lines.append(f"  {m['adSetName']} | {m['gifts']} מתנות ({cpg_str}) — שקול להחזיר")
         lines.append("")
 
-    lines.append("---")
-    lines.append("")
-
-    # פעולות מיידיות
-    lines.append("⚡ *פעולות מיידיות*")
-    lines.append("")
-
-    to_scale = [m for m in sorted_metrics if status(m) == "excellent"]
-    to_stop  = [m for m in sorted_metrics if status(m) == "stop"]
-    to_check_off = [m for m in sorted_metrics if status(m) == "off" and cpg_of(m) <= 22 and m["totalLeads"] >= 10]
+    # ─── פעולות ───
+    lines.append("─────────────────")
+    to_scale = [m for m in active_metrics if status(m) == "excellent"]
+    to_stop  = [m for m in active_metrics if status(m) == "stop"]
 
     for m in to_scale[:2]:
-        lines.append(f"יאללה תגדיל על *{m['adSetName']}* — היא עובדת, אל תהיה קמצן.")
+        lines.append(f"📈 תגדיל: *{m['adSetName']}*")
     for m in to_stop:
-        lines.append(f"תכלס *{m['adSetName']}* אוכלת כסף ולא מביאה כלום. חאלס.")
-    for m in to_check_off:
-        lines.append(f"🔄 *{m['adSetName']}* כבויה אבל ביצועים טובים — שקול להחזיר אותה.")
+        lines.append(f"🛑 עצור: *{m['adSetName']}*")
 
-    # תובנה מרכזית
-    if to_scale:
-        best = to_scale[0]
-        lines.append(f"")
-        lines.append(f"💡 *{best['adSetName']}* מביאה מתנות ב-₪{cpg_of(best):.1f} — זה הזהב שלך, תזין אותה.")
-
-    # אזהרה
     big_no_tx = next(
-        (m for m in sorted(metrics, key=lambda x: -x["budget"])
-         if m["active"] and m["transactions"] == 0 and m["budget"] > 800), None
+        (m for m in sorted(active_metrics, key=lambda x: -x["budget"])
+         if m["transactions"] == 0 and m["budget"] > 800), None
     )
     if big_no_tx:
-        lines.append(f"⚠️ *{big_no_tx['adSetName']}* הוציאה ₪{round(big_no_tx['budget'])} ואפס עסקאות. שבוע עוד — אחרי זה חותכים.")
+        lines.append(f"⚠️ *{big_no_tx['adSetName']}* — ₪{round(big_no_tx['budget']):,} ואפס עסקאות")
 
-    lines.append("")
-    lines.append("יאללה קדימה, תעשה מה שצריך 💪")
+    if to_scale:
+        best = to_scale[0]
+        lines.append(f"💡 הזהב: *{best['adSetName']}* | ₪{round(cpg_of(best))}/מתנה")
 
     return "\n".join(lines)
 

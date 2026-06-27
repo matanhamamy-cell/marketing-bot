@@ -3,7 +3,12 @@ name: Daily Summary
 on:
   schedule:
     # ראשון–חמישי ב-20:00 שעון ישראל (קיץ = UTC+3) → 17:00 UTC
+    # 5 כניסות בטווח 40 דק' — הראשון שיגיע שולח, השאר מוצאים ע"י cache
+    - cron: '40 16 * * 0-4'
+    - cron: '50 16 * * 0-4'
     - cron: '0 17 * * 0-4'
+    - cron: '10 17 * * 0-4'
+    - cron: '20 17 * * 0-4'
   workflow_dispatch:
 
 jobs:
