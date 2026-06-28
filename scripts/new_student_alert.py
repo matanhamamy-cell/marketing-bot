@@ -228,12 +228,12 @@ def main() -> None:
 
         link = search_student(schooler_token, phone)
         if not link:
-            print(f"{name}: still not found in Schooler after retries — sending Telegram alert")
-            send_telegram_not_in_schooler(name, phone, agent)
-            continue
+            print(f"{name}: still not found in Schooler after retries — sending alert without link")
+            link = "⚠️ לא נמצא בסקולר — בדוק ידנית"
 
         green = SALES_AGENTS[agent]
-        send_whatsapp(green['instance_id'], green['token'], green['self_chat_id'], name, link)
+        if not link.startswith("⚠️"):
+            send_whatsapp(green['instance_id'], green['token'], green['self_chat_id'], name, link)
         send_telegram(name, agent)
         send_telegram_link(name, phone, email, link)
         print(f"WhatsApp sent to {agent} and Telegram sent about {name}")
