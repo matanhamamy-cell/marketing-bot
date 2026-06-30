@@ -2,12 +2,9 @@ name: Monthly Summary
 
 on:
   schedule:
-    # ניסיון ראשון: 1 לחודש ב-09:00 ישראל (קיץ) → 06:00 UTC
-    - cron: '0 6 1 * *'
-    # גיבוי: 2 לחודש — אם ה-1 פוספס
-    - cron: '0 6 2 * *'
-    # גיבוי: 3 לחודש — אם ה-2 גם פוספס
-    - cron: '0 6 3 * *'
+    # Cloudflare Worker שולח workflow_dispatch ב-07:00 UTC (10:00 ישראל) ב-1 לחודש
+    # טריגר גיבוי: 09:00 UTC (12:00 ישראל) ב-2 לחודש — רק אם ה-Worker נכשל
+    - cron: '0 9 2 * *'
   workflow_dispatch:
 
 jobs:
@@ -17,14 +14,15 @@ jobs:
 
     steps:
       - name: Set run month
-        run: echo "RUN_MONTH=$(date +%Y-%m)" >> $GITHUB_ENV
+        id: month
+        run: echo "key=$(date +%Y-%m)" >> $GITHUB_OUTPUT
 
       - name: Check if already sent this month
         id: cache
         uses: actions/cache@v4
         with:
           path: .sent-marker
-          key: monthly-${{ env.RUN_MONTH }}
+          key: monthly-${{ steps.month.outputs.key }}
 
       - name: Checkout
         if: steps.cache.outputs.cache-hit != 'true'
