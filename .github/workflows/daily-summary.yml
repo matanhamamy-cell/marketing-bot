@@ -3,8 +3,11 @@ name: Daily Summary
 on:
   schedule:
     # יעד: 20:00 שעון ישראל (קיץ UTC+3 → 17:00 UTC)
-    # GitHub Actions יכול לאחר עד שעה — מתחילים מ-15:00 UTC (18:00 IST)
+    # GitHub מאחר 2-2.5 שעות בשעות עמוסות — מתחילים מ-14:00 UTC (17:00 IST)
     # עם cache, רק הטריגר הראשון שרץ ישלח; השאר מדלגים
+    - cron: '0 14 * * 0-4'
+    - cron: '20 14 * * 0-4'
+    - cron: '40 14 * * 0-4'
     - cron: '0 15 * * 0-4'
     - cron: '20 15 * * 0-4'
     - cron: '40 15 * * 0-4'
@@ -22,14 +25,15 @@ jobs:
 
     steps:
       - name: Set run date
-        run: echo "RUN_DATE=$(date +%Y-%m-%d)" >> $GITHUB_ENV
+        id: date
+        run: echo "key=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
 
       - name: Check if already sent today
         id: cache
         uses: actions/cache@v4
         with:
           path: .sent-marker
-          key: daily-${{ env.RUN_DATE }}
+          key: daily-${{ steps.date.outputs.key }}
 
       - name: Checkout
         if: steps.cache.outputs.cache-hit != 'true'
