@@ -13,6 +13,8 @@ SCHOOLER_CLIENT_SECRET = os.environ.get('SCHOOLER_CLIENT_SECRET', '')
 SCHOOLER_USER_ID = os.environ.get('SCHOOLER_USER_ID', '')
 TG_TOKEN = os.environ.get('TG_TOKEN', '')
 TG_CHAT_ID = os.environ.get('TG_CHAT_ID', '')
+SALES_BOT_TOKEN = os.environ.get('SALES_BOT_TOKEN', '')
+SALES_CHAT_ID = os.environ.get('SALES_CHAT_ID', '')
 
 MONDAY_BOARD_ID = 1722246362
 SCHOOLER_BASE = 'https://api.schooler.biz'
@@ -145,10 +147,10 @@ def send_whatsapp(instance_id: str, token: str, self_chat_id: str, student_name:
     resp.raise_for_status()
 
 
-def send_telegram(student_name: str, agent_name: str) -> None:
+def send_telegram(student_name: str) -> None:
     if not TG_TOKEN or not TG_CHAT_ID:
         return
-    message = f"מתכלי תלמיד חדש נרשם! 🎉\n*{student_name}* | {agent_name}"
+    message = f"תלמיד חדש נכנס ✅\n*{student_name}*"
     requests.post(
         f'https://api.telegram.org/bot{TG_TOKEN}/sendMessage',
         json={'chat_id': TG_CHAT_ID, 'text': message, 'parse_mode': 'Markdown'},
@@ -156,8 +158,8 @@ def send_telegram(student_name: str, agent_name: str) -> None:
     )
 
 
-def send_telegram_link(student_name: str, phone: str, email: str | None, link: str) -> None:
-    if not TG_TOKEN or not TG_CHAT_ID:
+def send_team_alert(student_name: str, phone: str, email: str | None, link: str | None) -> None:
+    if not SALES_BOT_TOKEN or not SALES_CHAT_ID:
         return
     text = (
         f"תלמיד חדש נכנס✅📲\n"
@@ -166,12 +168,12 @@ def send_telegram_link(student_name: str, phone: str, email: str | None, link: s
         f"שם מלא:  {student_name}\n"
         f"מייל:  {email or '—'}\n"
         f"מספר טלפון: {phone}\n"
-        f"\n"
-        f"לינק ישיר לפורטל:  {link}"
     )
+    if link:
+        text += f"\nלינק ישיר לפורטל:  {link}"
     requests.post(
-        f'https://api.telegram.org/bot{TG_TOKEN}/sendMessage',
-        json={'chat_id': TG_CHAT_ID, 'text': text},
+        f'https://api.telegram.org/bot{SALES_BOT_TOKEN}/sendMessage',
+        json={'chat_id': SALES_CHAT_ID, 'text': text},
         timeout=15,
     )
 
@@ -203,13 +205,12 @@ def main() -> None:
         save_last_check(now)
         return
 
-    if not SCHOOLER_CLIENT_ID:
-        print("Schooler credentials not configured yet — skipping.")
-        save_last_check(now)
-        return
-
-    print(f"Found {len(new_items)} new item(s). Getting Schooler token...")
-    schooler_token = get_schooler_token()
+    schooler_token = None
+    if SCHOOLER_CLIENT_ID:
+        print(f"Found {len(new_items)} new item(s). Getting Schooler token...")
+        schooler_token = get_schooler_token()
+    else:
+        print(f"Found {len(new_items)} new item(s). Schooler not configured — sending without link.")
 
     errors = []
     for item in new_items:
@@ -220,23 +221,17 @@ def main() -> None:
             msg = f"Item {item_id}: missing name or phone"
             print(msg); errors.append(msg); continue
 
-        if not agent or agent not in SALES_AGENTS:
-            msg = f"Item {item_id} ({name}): unknown agent '{agent}'"
-            print(msg); errors.append(msg); continue
+        print(f"Processing: {name} ({phone})")
 
-        print(f"Processing: {name} ({phone}) — נציג: {agent}")
+        link = None
+        if schooler_token:
+            link = search_student(schooler_token, phone)
+            if not link:
+                print(f"{name}: not found in Schooler after retries")
 
-        link = search_student(schooler_token, phone)
-        if not link:
-            print(f"{name}: still not found in Schooler after retries — sending alert without link")
-            link = "⚠️ לא נמצא בסקולר — בדוק ידנית"
-
-        green = SALES_AGENTS[agent]
-        if not link.startswith("⚠️"):
-            send_whatsapp(green['instance_id'], green['token'], green['self_chat_id'], name, link)
-        send_telegram(name, agent)
-        send_telegram_link(name, phone, email, link)
-        print(f"WhatsApp sent to {agent} and Telegram sent about {name}")
+        send_team_alert(name, phone, email, link)
+        send_telegram(name)
+        print(f"Alerts sent for {name}")
 
     save_last_check(now)
 
