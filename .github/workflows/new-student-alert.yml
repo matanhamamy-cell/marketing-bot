@@ -44,5 +44,7 @@ jobs:
           SCHOOLER_USER_ID:       ${{ secrets.SCHOOLER_USER_ID }}
           TG_TOKEN:               ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID:             ${{ secrets.TG_CHAT_ID }}
+          SALES_BOT_TOKEN:        ${{ secrets.SALES_BOT_TOKEN }}
+          SALES_CHAT_ID:          ${{ secrets.SALES_CHAT_ID }}
           LOOKBACK_HOURS:         ${{ github.event.inputs.lookback_hours }}
         run: python scripts/new_student_alert.py
