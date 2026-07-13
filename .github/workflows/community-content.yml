@@ -1,0 +1,52 @@
+name: Community Content Bot
+
+on:
+  schedule:
+    # 07:00 שעון ישראל (בקירוב, בלי התאמת שעון קיץ/חורף) — ראשון, שני, רביעי, חמישי, שישי
+    - cron: '0 4 * * 0,1,3,4,5'
+  workflow_dispatch:
+    inputs:
+      force_slot:
+        description: 'כפה סלוט ספציפי לבדיקה: value / social_proof / lifestyle / motivational / cta'
+        required: false
+        default: ''
+
+jobs:
+  send-content:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Restore last-CTA state
+        uses: actions/cache@v5
+        with:
+          path: /tmp/last_community_cta.txt
+          key: community-cta-state-${{ github.run_id }}
+          restore-keys: |
+            community-cta-state-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run community content bot
+        env:
+          ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}
+          COMMUNITY_BOT_TOKEN: ${{ secrets.COMMUNITY_BOT_TOKEN }}
+          COMMUNITY_CHAT_ID:   ${{ secrets.COMMUNITY_CHAT_ID }}
+          BITLY_ACCESS_TOKEN:  ${{ secrets.BITLY_ACCESS_TOKEN }}
+          BIO_BITLINK:         ${{ secrets.BIO_BITLINK }}
+          FORCE_SLOT:          ${{ github.event.inputs.force_slot }}
+        run: python scripts/community_content_bot.py
+
+      - name: Commit updated links log (if changed)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add scripts/community_links_log.csv 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "עדכון יומן לינקים - קהילת ווצאפ [skip ci]"
+          git push || true

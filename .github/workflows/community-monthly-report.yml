@@ -1,0 +1,28 @@
+name: Community Monthly Report
+
+on:
+  schedule:
+    # 1 לחודש, 06:00 UTC (~09:00 שעון ישראל)
+    - cron: '0 6 1 * *'
+  workflow_dispatch:
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run monthly report
+        env:
+          COMMUNITY_BOT_TOKEN: ${{ secrets.COMMUNITY_BOT_TOKEN }}
+          COMMUNITY_CHAT_ID:   ${{ secrets.COMMUNITY_CHAT_ID }}
+          BITLY_ACCESS_TOKEN:  ${{ secrets.BITLY_ACCESS_TOKEN }}
+        run: python scripts/community_monthly_report.py
