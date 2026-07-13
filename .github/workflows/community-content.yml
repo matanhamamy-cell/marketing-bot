@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       force_slot:
-        description: 'כפה סלוט ספציפי לבדיקה: value / social_proof / lifestyle / motivational / cta'
+        description: 'כפה סלוט ספציפי: value / social_proof / lifestyle / motivational / cta / launch (חד-פעמי, פתיחת הקהילה)'
         required: false
         default: ''
 
