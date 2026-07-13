@@ -2,10 +2,12 @@
 """
 בוט "הקהילה של מתן חממי" — שולח למתן תבנית תוכן מוכנה + הנחיית משלוח,
 לפי לוח תוכן שבועי לקבוצת הווצאפ השקטה שלו. רץ באמצעות GitHub Actions
-בימי ראשון/שני/רביעי/חמישי/שישי בבוקר שעון ישראל.
+בימי ראשון/רביעי/שישי בבוקר שעון ישראל (3 פעמים בשבוע - קצב מתון בכוונה).
 
-מתן מעתיק-מדביק את התבנית לקבוצה. פעם ב-7-10 ימים בלבד מגיע סלוט עם
-קריאה לפעולה (CTA) ולינק Bitly מתויג למעקב קליקים.
+ראשון = ערך קבוע. רביעי מתחלף בין הוכחה חברתית ותוכן אישי (לפי זוגיות
+מספר השבוע). שישי הוא בדרך כלל קופי מוטיבציוני, ומתחלף ל-CTA עם לינק
+Bitly מתויג פעם ב-14 יום בלבד (כל שישי שני). מתן מעתיק-מדביק את התבנית
+לקבוצה.
 """
 
 import json
@@ -23,21 +25,12 @@ BITLY_ACCESS_TOKEN = os.environ.get("BITLY_ACCESS_TOKEN", "")
 BIO_BITLINK_TARGET = os.environ.get("BIO_BITLINK", "")  # יעד ה-CTA (דף נחיתה/הרשמה)
 
 FORCE_SLOT = os.environ.get("FORCE_SLOT", "").strip()  # לבדיקה ידנית / הפעלת סלוט חד-פעמי דרך workflow_dispatch
-MIN_DAYS_BETWEEN_CTA = 10  # פער מינימלי בין CTA-ים - עם שישי כל 7 ימים, 10 מבטיח שלפחות שישי אחד מדלג ביניהם
+MIN_DAYS_BETWEEN_CTA = 14  # שישי אחד מתוך שניים בממוצע (בקשת מתן: 2-3 הודעות בשבוע בסה"כ, CTA נדיר בתוכן)
 
 STATE_FILE = "/tmp/last_community_cta.txt"
 LINKS_LOG = os.path.join(SCRIPT_DIR, "community_links_log.csv")
 
 ANTHROPIC_MODEL = "claude-sonnet-5"
-
-# יום בשבוע (Python weekday: Monday=0 ... Sunday=6) → סלוט
-SLOT_BY_WEEKDAY = {
-    6: "value",         # ראשון
-    0: "social_proof",  # שני
-    2: "lifestyle",     # רביעי
-    3: "motivational",  # חמישי
-    4: "cta",           # שישי
-}
 
 SLOT_LABELS = {
     "value": "ערך/חינוכי",
@@ -94,10 +87,29 @@ def load_text(filename: str) -> str:
 
 
 def determine_slot() -> str:
+    """
+    ראשון (weekday=6) → value קבוע.
+    רביעי (weekday=2) → מתחלף לפי זוגיות מספר השבוע (ISO): social_proof / lifestyle.
+    שישי (weekday=4) → motivational כברירת מחדל, cta אם עברו מספיק ימים מה-CTA הקודם.
+    """
     if FORCE_SLOT:
         return FORCE_SLOT
-    weekday = datetime.now().weekday()
-    return SLOT_BY_WEEKDAY.get(weekday, "value")
+
+    today = date.today()
+    weekday = today.weekday()
+
+    if weekday == 6:
+        return "value"
+    if weekday == 2:
+        week_number = today.isocalendar()[1]
+        return "social_proof" if week_number % 2 == 0 else "lifestyle"
+    if weekday == 4:
+        since = days_since_last_cta()
+        if since is None or since >= MIN_DAYS_BETWEEN_CTA:
+            return "cta"
+        return "motivational"
+
+    return "value"  # לא אמור לקרות - ה-cron רץ רק בימים שלמעלה
 
 
 def days_since_last_cta() -> int | None:
@@ -244,12 +256,6 @@ def format_message(slot: str, claude_output: str) -> str:
 
 def main() -> None:
     slot = determine_slot()
-
-    if slot == "cta":
-        since = days_since_last_cta()
-        if since is not None and since < MIN_DAYS_BETWEEN_CTA:
-            print(f"[INFO] רק {since} ימים מאז ה-CTA האחרון — עובר לסלוט 'value' במקום.")
-            slot = "value"
 
     link = None
     if slot == "cta":
