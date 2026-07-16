@@ -5,11 +5,14 @@ export interface Env {
 }
 
 interface PowerDocCallback {
-	clientName?: string;
-	email?: string;
-	phone?: string;
-	event?: string;
-	signedFormId?: string;
+	ClientName?: string;
+	Email?: string;
+	Phone?: string;
+	Event?: string;
+	SignedFormId?: string;
+	DocumentList?: unknown;
+	Data?: unknown;
+	[key: string]: unknown;
 }
 
 function isAuthorized(req: Request, env: Env): boolean {
@@ -51,9 +54,10 @@ export default {
 			return new Response('Bad Request', { status: 400 });
 		}
 
-		const name = payload.clientName?.trim();
+		const name = payload.ClientName?.trim();
 		if (!name) {
-			console.log('Signed callback with no clientName', JSON.stringify(payload));
+			const { DocumentList, Data, ...rest } = payload;
+			console.log('Signed callback with no ClientName:', JSON.stringify(rest));
 			return new Response('ok', { status: 200 });
 		}
 
