@@ -1,0 +1,14 @@
+{
+  "name": "contract-signed-webhook",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "latest",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.111.0"
+  }
+}

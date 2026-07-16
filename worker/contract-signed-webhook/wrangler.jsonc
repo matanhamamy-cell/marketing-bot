@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "contract-signed-webhook",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-16",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}
