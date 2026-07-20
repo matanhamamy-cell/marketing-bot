@@ -208,7 +208,10 @@ def main() -> None:
     schooler_token = None
     if SCHOOLER_CLIENT_ID:
         print(f"Found {len(new_items)} new item(s). Getting Schooler token...")
-        schooler_token = get_schooler_token()
+        try:
+            schooler_token = get_schooler_token()
+        except requests.exceptions.RequestException as e:
+            print(f"Schooler auth failed, sending without link: {e}")
     else:
         print(f"Found {len(new_items)} new item(s). Schooler not configured — sending without link.")
 
