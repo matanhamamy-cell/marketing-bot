@@ -42,6 +42,7 @@ jobs:
           SCHOOLER_CLIENT_ID:     ${{ secrets.SCHOOLER_CLIENT_ID }}
           SCHOOLER_CLIENT_SECRET: ${{ secrets.SCHOOLER_CLIENT_SECRET }}
           SCHOOLER_USER_ID:       ${{ secrets.SCHOOLER_USER_ID }}
+          SCHOOLER_USER_SECRET:   ${{ secrets.SCHOOLER_USER_SECRET }}
           TG_TOKEN:               ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID:             ${{ secrets.TG_CHAT_ID }}
           SALES_BOT_TOKEN:        ${{ secrets.SALES_BOT_TOKEN }}

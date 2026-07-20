@@ -11,6 +11,7 @@ MONDAY_API_TOKEN = os.environ['MONDAY_API_TOKEN']
 SCHOOLER_CLIENT_ID = os.environ.get('SCHOOLER_CLIENT_ID', '')
 SCHOOLER_CLIENT_SECRET = os.environ.get('SCHOOLER_CLIENT_SECRET', '')
 SCHOOLER_USER_ID = os.environ.get('SCHOOLER_USER_ID', '')
+SCHOOLER_USER_SECRET = os.environ.get('SCHOOLER_USER_SECRET', '')
 TG_TOKEN = os.environ.get('TG_TOKEN', '')
 TG_CHAT_ID = os.environ.get('TG_CHAT_ID', '')
 SALES_BOT_TOKEN = os.environ.get('SALES_BOT_TOKEN', '')
@@ -98,6 +99,7 @@ def get_schooler_token() -> str:
             'client_id': SCHOOLER_CLIENT_ID,
             'client_secret': SCHOOLER_CLIENT_SECRET,
             'user_id': SCHOOLER_USER_ID,
+            'user_secret': SCHOOLER_USER_SECRET,
         },
         timeout=15,
     )
