@@ -1,5 +1,9 @@
 name: New Student Alert
 
+concurrency:
+  group: new-student-alert
+  cancel-in-progress: false
+
 on:
   schedule:
     # every 5 minutes
