@@ -1,5 +1,9 @@
 name: Daily Summary
 
+concurrency:
+  group: daily-summary
+  cancel-in-progress: false
+
 on:
   schedule:
     # Cloudflare Worker שולח workflow_dispatch ב-17:00 UTC (20:00 ישראל) — הוא הטריגר הראשי
