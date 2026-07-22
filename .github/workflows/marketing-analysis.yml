@@ -1,5 +1,9 @@
 name: Marketing Analysis
 
+concurrency:
+  group: marketing-analysis
+  cancel-in-progress: false
+
 on:
   schedule:
     # Cloudflare Worker שולח workflow_dispatch ב-07:00 UTC (10:00 ישראל) — הוא הטריגר הראשי

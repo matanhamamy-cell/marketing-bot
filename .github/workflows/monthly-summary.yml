@@ -1,5 +1,9 @@
 name: Monthly Summary
 
+concurrency:
+  group: monthly-summary
+  cancel-in-progress: false
+
 on:
   schedule:
     # Cloudflare Worker שולח workflow_dispatch ב-07:00 UTC (10:00 ישראל) ב-1 לחודש
