@@ -4,6 +4,9 @@ concurrency:
   group: marketing-analysis
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 on:
   schedule:
     # Cloudflare Worker שולח workflow_dispatch ב-07:00 UTC (10:00 ישראל) — הוא הטריגר הראשי
@@ -17,29 +20,27 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Set run date
-        id: date
-        run: echo "key=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
-
-      - name: Check if already sent today
-        id: cache
-        uses: actions/cache@v4
-        with:
-          path: .sent-marker
-          key: marketing-${{ steps.date.outputs.key }}
-
       - name: Checkout
-        if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
 
+      - name: Check if already sent today
+        id: check
+        run: |
+          TODAY=$(date +%Y-%m-%d)
+          if [ -f data/.marketing-analysis-sent ] && [ "$(cat data/.marketing-analysis-sent)" = "$TODAY" ]; then
+            echo "already_sent=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already_sent=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Python
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.check.outputs.already_sent != 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Run Marketing Analysis
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.check.outputs.already_sent != 'true'
         env:
           META_ACCESS_TOKEN:   ${{ secrets.META_ACCESS_TOKEN }}
           META_AD_ACCOUNT_ID:  ${{ secrets.META_AD_ACCOUNT_ID }}
@@ -54,5 +55,12 @@ jobs:
         run: python scripts/marketing_analysis_cloud.py
 
       - name: Mark as sent
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: echo "sent" > .sent-marker
+        if: steps.check.outputs.already_sent != 'true'
+        run: |
+          date +%Y-%m-%d > data/.marketing-analysis-sent
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/.marketing-analysis-sent
+          git commit -m "Mark marketing analysis sent for $(date +%Y-%m-%d)"
+          git pull --rebase origin main
+          git push
