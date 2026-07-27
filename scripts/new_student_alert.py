@@ -20,7 +20,7 @@ SALES_CHAT_ID = os.environ.get('SALES_CHAT_ID', '')
 MONDAY_BOARD_ID = 1722246362
 SCHOOLER_BASE = 'https://api.schooler.biz'
 GREEN_BASE = 'https://api.green-api.com'
-STATE_FILE = '/tmp/last_student_check.txt'
+STATE_FILE = 'data/.new-student-last-check'
 
 # GREEN API instance per salesperson — each agent receives the alert on their own WhatsApp
 SALES_AGENTS = {
