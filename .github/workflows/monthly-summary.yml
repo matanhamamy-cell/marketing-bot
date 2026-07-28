@@ -61,5 +61,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/.monthly-summary-sent
           git commit -m "Mark monthly summary sent for $(date +%Y-%m)"
-          git pull --rebase origin main
+          git pull --rebase -X ours origin main
           git push
