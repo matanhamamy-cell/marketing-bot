@@ -29,6 +29,7 @@ MIN_DAYS_BETWEEN_CTA = 14  # שישי אחד מתוך שניים בממוצע (�
 
 STATE_FILE = "/tmp/last_community_cta.txt"
 LINKS_LOG = os.path.join(SCRIPT_DIR, "community_links_log.csv")
+CALENDAR_FILE = os.path.join(SCRIPT_DIR, "community_calendar_august_2026.json")
 
 ANTHROPIC_MODEL = "claude-sonnet-5"
 
@@ -76,6 +77,20 @@ SLOT_INSTRUCTIONS = {
         "כנות לא מנוקה) אבל ברמת אנרגיה והתרוממות גבוהה יותר מכל סלוט אחר - זו ה'בוננזה'."
     ),
 }
+
+
+def load_calendar_entry(today_iso: str) -> dict | None:
+    """
+    לוח תוכן ידני מוכן מראש לחודש אוגוסט 2026 (אושר עם מתן מראש, כולל
+    פוסט הפתיחה של הקהילה). אם יש הודעה לתאריך הנוכחי - שולחים אותה
+    כמו שהיא, בלי לקרוא ל-Claude ובלי לגעת בלוגיקת ה-CTA (אין מכירה
+    בכלל בחודש הזה). אם אין - חוזרים ללוגיקה הדינמית הרגילה.
+    """
+    if not os.path.exists(CALENDAR_FILE):
+        return None
+    with open(CALENDAR_FILE, "r", encoding="utf-8") as f:
+        calendar = json.load(f)
+    return calendar.get(today_iso)
 
 
 def load_text(filename: str) -> str:
@@ -255,6 +270,24 @@ def format_message(slot: str, claude_output: str) -> str:
 
 
 def main() -> None:
+    today_iso = date.today().isoformat()
+    calendar_entry = load_calendar_entry(today_iso)
+
+    if calendar_entry:
+        today_label = date.today().strftime("%d/%m")
+        message = (
+            f"📅 <b>{today_label} — {calendar_entry['label']}</b>\n\n"
+            f"{calendar_entry['text']}\n\n"
+            f"<i>הנחיית משלוח: {calendar_entry['delivery_note']}</i>\n\n"
+            f"יאללה, קדימה 💪"
+        )
+        print("\n--- MESSAGE PREVIEW (מלוח אוגוסט הקבוע) ---")
+        print(message)
+        print("---\n")
+        send_telegram(message)
+        print("[INFO] Done ✅")
+        return
+
     slot = determine_slot()
 
     link = None
