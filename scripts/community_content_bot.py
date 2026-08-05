@@ -30,6 +30,7 @@ MIN_DAYS_BETWEEN_CTA = 14  # שישי אחד מתוך שניים בממוצע (�
 STATE_FILE = "/tmp/last_community_cta.txt"
 LINKS_LOG = os.path.join(SCRIPT_DIR, "community_links_log.csv")
 CALENDAR_FILE = os.path.join(SCRIPT_DIR, "community_calendar_august_2026.json")
+CALENDAR_LOCKED_MONTH = (2026, 8)  # באוגוסט 2026 - רק תוכן מהלוח המאושר, בלי fallback ליצירה דינמית
 
 ANTHROPIC_MODEL = "claude-sonnet-5"
 
@@ -286,6 +287,14 @@ def main() -> None:
         print("---\n")
         send_telegram(message)
         print("[INFO] Done ✅")
+        return
+
+    today = date.today()
+    if (today.year, today.month) == CALENDAR_LOCKED_MONTH:
+        print(
+            f"[INFO] {today_iso} בתוך חודש נעול ({CALENDAR_LOCKED_MONTH}) אבל אין entry בלוח - "
+            "מדלגים בלי לשלוח ובלי ליצור תוכן דינמי."
+        )
         return
 
     slot = determine_slot()
