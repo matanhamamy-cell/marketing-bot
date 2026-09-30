@@ -66,6 +66,30 @@ def get_monday_new_items(since: datetime) -> list:
     return new_items
 
 
+def get_monday_item(item_id: str) -> dict | None:
+    query = """
+    query($item_id: [ID!]) {
+        items(ids: $item_id) {
+            id
+            created_at
+            column_values(ids: ["text__1", "phone__1", "email__1", "color_mkxsr8f9"]) {
+                id
+                text
+            }
+        }
+    }
+    """
+    resp = requests.post(
+        'https://api.monday.com/v2',
+        headers={'Authorization': MONDAY_API_TOKEN, 'Content-Type': 'application/json'},
+        json={'query': query, 'variables': {'item_id': [str(item_id)]}},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    items = resp.json()['data']['items']
+    return items[0] if items else None
+
+
 def extract_columns(item: dict) -> tuple[str | None, str | None, str | None, str | None]:
     name = phone = agent = email = None
     for col in item['column_values']:
@@ -222,8 +246,22 @@ def main() -> None:
         item_id = item['id']
         name, phone, email, agent = extract_columns(item)
 
+        # Monday sometimes hasn't finished populating columns yet on a
+        # just-created item (race with the upstream Make.com automation) —
+        # give it a moment and re-fetch this one item before giving up.
+        retries = 3
+        for attempt in range(retries):
+            if name and phone:
+                break
+            if attempt < retries - 1:
+                print(f"Item {item_id}: missing name or phone, retrying in 10s...")
+                time.sleep(10)
+                refreshed = get_monday_item(item_id)
+                if refreshed:
+                    name, phone, email, agent = extract_columns(refreshed)
+
         if not name or not phone:
-            msg = f"Item {item_id}: missing name or phone"
+            msg = f"Item {item_id}: missing name or phone after retries"
             print(msg); errors.append(msg); continue
 
         print(f"Processing: {name} ({phone})")
