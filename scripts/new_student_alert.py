@@ -204,31 +204,57 @@ def send_team_alert(student_name: str, phone: str, email: str | None, link: str 
     )
 
 
-def load_last_check() -> datetime:
-    lookback = os.environ.get('LOOKBACK_HOURS', '').strip()
-    if lookback:
-        return datetime.now(timezone.utc) - timedelta(hours=float(lookback))
+LOOKBACK_MARGIN = timedelta(minutes=3)
+MAX_REMEMBERED_IDS = 200
+
+
+def load_state() -> tuple[datetime, set[str], bool]:
+    """Returns (last_check, processed_item_ids, has_id_history)."""
+    last_check = datetime.now(timezone.utc) - timedelta(minutes=10)
+    processed: set[str] = set()
+    has_id_history = False
+
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE) as f:
-            return datetime.fromisoformat(f.read().strip())
-    return datetime.now(timezone.utc) - timedelta(minutes=10)
+            lines = [l.strip() for l in f.read().splitlines() if l.strip()]
+        if lines:
+            last_check = datetime.fromisoformat(lines[0])
+            if len(lines) > 1 and lines[1] == 'v2':
+                has_id_history = True
+                processed = set(lines[2:])
+
+    lookback = os.environ.get('LOOKBACK_HOURS', '').strip()
+    if lookback:
+        last_check = datetime.now(timezone.utc) - timedelta(hours=float(lookback))
+    return last_check, processed, has_id_history
 
 
-def save_last_check(ts: datetime) -> None:
+def save_state(ts: datetime, processed: set[str]) -> None:
+    recent = sorted(processed, key=lambda x: (len(x), x))[-MAX_REMEMBERED_IDS:]
     with open(STATE_FILE, 'w') as f:
-        f.write(ts.isoformat())
+        f.write('\n'.join([ts.isoformat(), 'v2', *recent]) + '\n')
 
 
 def main() -> None:
-    last_check = load_last_check()
+    last_check, processed_ids, has_id_history = load_state()
     now = datetime.now(timezone.utc)
+    manual = bool(os.environ.get('LOOKBACK_HOURS', '').strip())
 
-    print(f"Checking for new students since {last_check.isoformat()}")
+    # Monday's created_at is truncated to whole seconds, and the checkpoint is
+    # a sub-second timestamp — an item created in the same second as the
+    # previous run's checkpoint reads as "older" than it and was lost forever.
+    # Re-scan a short window and dedupe by item id instead. Skip the margin the
+    # first time (no id history yet) so already-alerted items aren't re-sent.
+    since = last_check - (LOOKBACK_MARGIN if has_id_history else timedelta(0))
 
-    new_items = get_monday_new_items(since=last_check)
+    print(f"Checking for new students since {since.isoformat()}")
+
+    new_items = get_monday_new_items(since=since)
+    if not manual:
+        new_items = [i for i in new_items if i['id'] not in processed_ids]
     if not new_items:
         print("No new items.")
-        save_last_check(now)
+        save_state(now, processed_ids)
         return
 
     schooler_token = None
@@ -275,8 +301,9 @@ def main() -> None:
         send_team_alert(name, phone, email, link)
         send_telegram(name)
         print(f"Alerts sent for {name}")
+        processed_ids.add(item_id)
 
-    save_last_check(now)
+    save_state(now, processed_ids)
 
     if errors:
         print(f"\n{len(errors)} error(s):")
