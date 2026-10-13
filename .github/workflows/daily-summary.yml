@@ -78,6 +78,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/.daily-summary-sent
+          git diff --cached --quiet && exit 0  # forced re-send of a date already marked
           git commit -m "Mark daily summary sent for $(TZ=Asia/Jerusalem date +%Y-%m-%d)"
           git pull --rebase -X ours origin main
           git push
