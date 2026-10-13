@@ -9,10 +9,15 @@ permissions:
 
 on:
   schedule:
-    # Cloudflare Worker שולח workflow_dispatch ב-17:00 UTC (20:00 ישראל) — הוא הטריגר הראשי
-    # טריגר גיבוי: 18:00 UTC (21:00 ישראל) — רק אם ה-Worker נכשל
+    # טריגרים ראשיים: Worker "daily-summary-trigger" (17:00 + 18:00 UTC, א׳–ה׳) ו-cron-job.org (20:00 ישראל).
+    # זה גיבוי בלבד. GitHub מעכב אותו 3–6 שעות, ולכן הוא כפוף לחלון השליחה שבהמשך.
     - cron: '0 18 * * 0-4'
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'לשלוח עכשיו גם מחוץ לחלון 20:00–23:59 וגם אם כבר נשלח היום'
+        type: boolean
+        default: false
 
 jobs:
   summary:
@@ -25,11 +30,24 @@ jobs:
         with:
           ref: main
 
+      # Everything in Israel time. The report goes out once per Israel date, and an automatic run only
+      # sends between 20:00 and 23:59 Israel time: a late GitHub schedule run (or the 19:00 winter-time
+      # Worker trigger) skips instead of sending a near-empty report and blocking that evening's real one.
       - name: Check if already sent today
         id: check
+        env:
+          FORCE: ${{ github.event.inputs.force }}
         run: |
-          TODAY=$(date +%Y-%m-%d)
-          if [ -f data/.daily-summary-sent ] && [ "$(cat data/.daily-summary-sent)" = "$TODAY" ]; then
+          TODAY=$(TZ=Asia/Jerusalem date +%Y-%m-%d)
+          HOUR=$(TZ=Asia/Jerusalem date +%-H)
+          echo "Israel time: $TODAY ${HOUR}h, force=${FORCE:-false}"
+          if [ "$FORCE" = "true" ]; then
+            echo "already_sent=false" >> "$GITHUB_OUTPUT"
+          elif [ -f data/.daily-summary-sent ] && [ "$(cat data/.daily-summary-sent)" = "$TODAY" ]; then
+            echo "Already sent for $TODAY"
+            echo "already_sent=true" >> "$GITHUB_OUTPUT"
+          elif [ "$HOUR" -lt 20 ]; then
+            echo "Outside the 20:00-23:59 Israel send window, skipping"
             echo "already_sent=true" >> "$GITHUB_OUTPUT"
           else
             echo "already_sent=false" >> "$GITHUB_OUTPUT"
@@ -56,10 +74,10 @@ jobs:
       - name: Mark as sent
         if: steps.check.outputs.already_sent != 'true'
         run: |
-          date +%Y-%m-%d > data/.daily-summary-sent
+          TZ=Asia/Jerusalem date +%Y-%m-%d > data/.daily-summary-sent
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/.daily-summary-sent
-          git commit -m "Mark daily summary sent for $(date +%Y-%m-%d)"
+          git commit -m "Mark daily summary sent for $(TZ=Asia/Jerusalem date +%Y-%m-%d)"
           git pull --rebase -X ours origin main
           git push

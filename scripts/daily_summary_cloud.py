@@ -5,7 +5,8 @@
 """
 
 import os, json, urllib.request, urllib.parse
-from datetime import date
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 MONDAY_API_TOKEN         = os.environ["MONDAY_API_TOKEN"]
 MONDAY_BOARD_ID          = os.environ["MONDAY_BOARD_ID"]
@@ -15,7 +16,8 @@ MONDAY_DATE_COL          = os.environ.get("MONDAY_DATE_COL",   "date__1")
 TG_TOKEN                 = os.environ["TG_TOKEN"]
 TG_CHAT_ID               = os.environ["TG_CHAT_ID"]
 
-today      = date.today()
+# Israel date, not the runner's UTC date (a late run after UTC midnight reported the wrong day)
+today      = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
 today_str  = today.isoformat()
 start_date = today.replace(day=1).isoformat()
 
